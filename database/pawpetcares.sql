@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1
--- Generation Time: Sep 15, 2025 at 07:05 AM
+-- Generation Time: Oct 31, 2025 at 03:56 PM
 -- Server version: 10.4.32-MariaDB
 -- PHP Version: 8.2.12
 
@@ -51,6 +51,13 @@ CREATE TABLE `users` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
+-- Dumping data for table `users`
+--
+
+INSERT INTO `users` (`id`, `first_name`, `middle_name`, `last_name`, `contact_number`, `email`, `password`, `street`, `barangay`, `city`, `province`, `postal_code`, `country`, `verification_code`, `reset_token`, `reset_token_expiry`, `is_verified`, `created_at`, `user_rules`, `profile_image`) VALUES
+(35, 'JAKE', 'MUBAS', 'LAGANGA', '09478984921', 'venzonanthonie@gmail.com', '$2y$10$gdMA3PwndRGmtXsDvuF2Mec1beokiZGdkVjO7jpgoJd3YRWOV4kIS', 'Purok 1', 'Dona Rosario', 'Tubay', 'Agusan del Norte', '8605', 'Philippines', NULL, NULL, NULL, 1, '2025-10-31 13:27:06', 0, 'user_35_6904c7fbbdcd9.jpg');
+
+--
 -- Indexes for dumped tables
 --
 
@@ -69,7 +76,7 @@ ALTER TABLE `users`
 -- AUTO_INCREMENT for table `users`
 --
 ALTER TABLE `users`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=35;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=36;
 COMMIT;
 
 /*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
