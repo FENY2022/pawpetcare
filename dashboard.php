@@ -253,7 +253,16 @@ if (!isset($_SESSION['loggedin']) || $_SESSION['loggedin'] !== true) {
                     <span class="notification-badge"></span>
                 </div>
                 <div class="flex items-center space-x-3">
-                    <img src="https://i.pravatar.cc/150?u=a042581f4e29026704d" alt="User Avatar" class="h-10 w-10 rounded-full object-cover">
+                    <?php
+                    $profileImage = $_SESSION['profile_image'] ?? '';
+                    if (!empty($profileImage)) {
+                        // Assuming profile images are stored in a 'storage' directory
+                        $imgSrc = 'uploads/profile_pictures/' . htmlspecialchars($profileImage);
+                    } else {
+                        $imgSrc = 'https://i.pravatar.cc/150?u=a042581f4e29026704d';
+                    }
+                    ?>
+                    <img src="<?php echo $imgSrc; ?>" alt="User Avatar" class="h-10 w-10 rounded-full object-cover">
                     <div>
                         <h4 class="font-semibold text-sm text-gray-700"><?php echo htmlspecialchars($_SESSION['first_name'] ?? 'User'); ?></h4>
                         <p class="text-xs text-gray-500">Pet Owner</p>
