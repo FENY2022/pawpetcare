@@ -4,7 +4,7 @@ require_once 'db.php'; // Database connection file
 
 $toast_message = null; // Initialize message variable
 
-// --- START: NEW CODE TO FETCH USER DATA ---
+// --- START: FETCH USER DATA ---
 
 // 1. Initialize an array to hold user data
 $user_data = [
@@ -16,7 +16,7 @@ $user_data = [
 
 // 1.1. Check if the database function exists before trying to use it
 if (!function_exists('get_db_connection')) {
-    // Set a toast message if the function is missing, so the user sees it on the page
+    // Set a toast message if the function is missing
     $toast_message = ['type' => 'error', 'message' => 'Database function get_db_connection() is missing from db.php.'];
 } 
 // Only proceed if the function exists AND the user is logged in
@@ -25,8 +25,8 @@ else if (isset($_SESSION['user_id'])) {
     $conn_user = get_db_connection();
 
     if ($conn_user) {
-// This is the corrected line 28
-$sql_user = "SELECT first_name, middle_name, last_name, email FROM users WHERE id = ?";
+        // --- THIS IS THE CORRECTED LINE ---
+        $sql_user = "SELECT first_name, middle_name, last_name, email FROM users WHERE id = ?";
         $stmt_user = $conn_user->prepare($sql_user);
         
         if ($stmt_user) {
@@ -49,14 +49,13 @@ $sql_user = "SELECT first_name, middle_name, last_name, email FROM users WHERE i
         $toast_message = ['type' => 'error', 'message' => 'Could not connect to database to fetch user data.'];
     }
 }
-// --- END: NEW CODE ---
+// --- END: FETCH USER DATA ---
 
 
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
 
     // Check DB connection function
     if (!function_exists('get_db_connection')) {
-        // This 'die' is fine here, as it's for form submission, not page load
         die("Database function 'get_db_connection()' not found.");
     }
 
@@ -70,42 +69,97 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         $error_msg = "";
 
         try {
-            // --- 1. Insert Client ---
-            $sql_client = "INSERT INTO clients 
-                (reg_date, valid_until, client_lname, client_fname, client_mname, client_sex, client_bday, client_contact, client_email, addr_purok, addr_brgy, addr_mun, addr_prov) 
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
             
-            $stmt_client = $conn->prepare($sql_client);
-            $stmt_client->bind_param(
-                "sssssssssssss",
-                $_POST['reg_date'],
-                $_POST['valid_until'],
-                $_POST['client_lname'],
-                $_POST['client_fname'],
-                $_POST['client_mname'],
-                $_POST['client_sex'],
-                $_POST['client_bday'],
-                $_POST['client_contact'],
-                $_POST['client_email'],
-                $_POST['addr_purok'],
-                $_POST['addr_brgy'],
-                $_POST['addr_mun'],
-                $_POST['addr_prov']
-            );
+            // --- START: Handle Pet Image Upload ---
+            $pet_image_path = null; // Default to NULL if no image is uploaded
+            
+            // Check if a file was uploaded without errors
+            if (isset($_FILES['pet_image']) && $_FILES['pet_image']['error'] == 0) {
+                
+                $upload_dir = 'uploads/pet_images/'; // Directory to store images
+                
+                // --- Create directory if it doesn't exist ---
+                if (!is_dir($upload_dir)) {
+                    if (!mkdir($upload_dir, 0755, true)) {
+                        // If mkdir fails, stop the transaction
+                        $all_ok = false;
+                        $error_msg = 'Failed to create file upload directory.';
+                    }
+                }
 
-            if (!$stmt_client->execute()) {
-                $all_ok = false;
-                $error_msg = $stmt_client->error;
+                if ($all_ok) { // Only proceed if directory exists or was created
+                    $file_info = new finfo(FILEINFO_MIME_TYPE);
+                    $mime_type = $file_info->file($_FILES['pet_image']['tmp_name']);
+                    $allowed_mime_types = ['image/jpeg', 'image/png', 'image/gif'];
+
+                    // --- Validation ---
+                    if ($_FILES['pet_image']['size'] > 5000000) { // 5MB limit
+                        $all_ok = false;
+                        $error_msg = 'File is too large. Max 5MB allowed.';
+                    }
+                    if (!in_array($mime_type, $allowed_mime_types)) {
+                        $all_ok = false;
+                        $error_msg = 'Invalid file type. Only JPG, PNG, and GIF are allowed.';
+                    }
+
+                    if ($all_ok) {
+                        // --- Create a unique filename ---
+                        $file_extension = pathinfo($_FILES['pet_image']['name'], PATHINFO_EXTENSION);
+                        $unique_filename = uniqid('pet_', true) . '.' . $file_extension;
+                        $target_file = $upload_dir . $unique_filename;
+
+                        // --- Move the file ---
+                        if (move_uploaded_file($_FILES['pet_image']['tmp_name'], $target_file)) {
+                            $pet_image_path = $target_file; // Set the path to be saved in DB
+                        } else {
+                            $all_ok = false;
+                            $error_msg = 'There was an error moving the uploaded file.';
+                        }
+                    }
+                }
             }
+            // --- END: Handle Pet Image Upload ---
 
-            $client_id = $conn->insert_id;
-            $stmt_client->close();
+
+            // --- 1. Insert Client ---
+            if ($all_ok) { // Only proceed if file upload was OK
+                $sql_client = "INSERT INTO clients 
+                    (reg_date, valid_until, client_lname, client_fname, client_mname, client_sex, client_bday, client_contact, client_email, addr_purok, addr_brgy, addr_mun, addr_prov) 
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+                
+                $stmt_client = $conn->prepare($sql_client);
+                $stmt_client->bind_param(
+                    "sssssssssssss",
+                    $_POST['reg_date'],
+                    $_POST['valid_until'],
+                    $_POST['client_lname'],
+                    $_POST['client_fname'],
+                    $_POST['client_mname'],
+                    $_POST['client_sex'],
+                    $_POST['client_bday'],
+                    $_POST['client_contact'],
+                    $_POST['client_email'],
+                    $_POST['addr_purok'],
+                    $_POST['addr_brgy'],
+                    $_POST['addr_mun'],
+                    $_POST['addr_prov']
+                );
+
+                if (!$stmt_client->execute()) {
+                    $all_ok = false;
+                    $error_msg = $stmt_client->error;
+                }
+
+                $client_id = $conn->insert_id;
+                $stmt_client->close();
+            }
 
             // --- 2. Insert Pet ---
             if ($all_ok) {
+                // --- MODIFIED SQL ---
                 $sql_pet = "INSERT INTO pets 
-                    (client_id, pet_origin, pet_origin_other, pet_ownership, pet_habitat, pet_species, pet_name, pet_breed, pet_bday, pet_color, pet_sex, pet_is_pregnant, pet_is_lactating, pet_puppies, pet_weight, pet_tag_no, tag_type_collar, tag_type_other, tag_type_other_specify, pet_contact) 
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+                    (client_id, pet_origin, pet_origin_other, pet_ownership, pet_habitat, pet_species, pet_name, pet_breed, pet_bday, pet_color, pet_sex, pet_is_pregnant, pet_is_lactating, pet_puppies, pet_weight, pet_tag_no, tag_type_collar, tag_type_other, tag_type_other_specify, pet_contact, pet_image_path) 
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
 
                 $stmt_pet = $conn->prepare($sql_pet);
 
@@ -116,8 +170,9 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                 $tag_type_collar = isset($_POST['tag_type_collar']) ? 1 : 0;
                 $tag_type_other = isset($_POST['tag_type_other']) ? 1 : 0;
 
+                // --- MODIFIED BIND_PARAM ---
                 $stmt_pet->bind_param(
-                    "issssssssssiiidiiiss",
+                    "issssssssssiiidiiisss", // Added 's' for pet_image_path
                     $client_id,
                     $_POST['pet_origin'],
                     $_POST['pet_origin_other'],
@@ -137,7 +192,8 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                     $tag_type_collar,
                     $tag_type_other,
                     $_POST['tag_type_other_specify'],
-                    $_POST['pet_contact']
+                    $_POST['pet_contact'],
+                    $pet_image_path // Added the new variable
                 );
 
                 if (!$stmt_pet->execute()) {
@@ -154,11 +210,19 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                 $toast_message = ['type' => 'success', 'message' => 'Pet registered successfully!'];
             } else {
                 $conn->rollback();
+                // Rollback file if it was saved
+                if ($pet_image_path && file_exists($pet_image_path)) {
+                    unlink($pet_image_path);
+                }
                 $toast_message = ['type' => 'error', 'message' => 'Registration failed: ' . htmlspecialchars($error_msg)];
             }
 
         } catch (Exception $e) {
             $conn->rollback();
+             // Rollback file if it was saved
+            if ($pet_image_path && file_exists($pet_image_path)) {
+                unlink($pet_image_path);
+            }
             $toast_message = ['type' => 'error', 'message' => 'An unexpected error occurred: ' . $e->getMessage()];
         }
 
@@ -182,7 +246,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         }
         /* Custom styles for radio/checkbox */
         .form-radio, .form-checkbox {
-            color: #4361ee; /* Using the primary color from your dashboard's CSS */
+            color: #4361ee;
         }
         
         /* --- Toast Notification Styles --- */
@@ -231,7 +295,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                 <h1 class="text-3xl font-bold text-gray-900 mt-4" style="color: #4361ee;">PET REGISTRATION</h1>
             </div>
 
-            <form action="add_pet.php" method="POST">
+            <form action="add_pet.php" method="POST" enctype="multipart/form-data">
 
                 <fieldset class="mb-10">
                     <legend class="text-2xl font-semibold text-gray-800 border-b-2 border-gray-200 pb-2 mb-6 w-full">
@@ -281,30 +345,21 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 
                         <div>
                             <label for="client_bday" class="block text-sm font-medium text-gray-700 mb-1">Birthday</label>
-                                <label for="client_bday" class="block text-sm font-medium text-gray-700">Birthday</label>
-                                <input 
+                            <input 
                                 type="date" 
                                 name="client_bday" 
                                 id="client_bday" 
                                 class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500" 
                                 required
-                                >
-
-                                <script>
-                                // Get today's date
+                            >
+                            <script>
                                 const today = new Date();
-
-                                // Subtract 18 years
                                 const adultYear = today.getFullYear() - 18;
                                 const adultMonth = String(today.getMonth() + 1).padStart(2, '0');
                                 const adultDay = String(today.getDate()).padStart(2, '0');
-
-                                // Format: YYYY-MM-DD
                                 const maxDate = `${adultYear}-${adultMonth}-${adultDay}`;
-
-                                // Set the max attribute to disallow minors
                                 document.getElementById("client_bday").setAttribute("max", maxDate);
-                                </script>
+                            </script>
                         </div>
                         
                         <div>
@@ -438,6 +493,23 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                             </div>
                         </div>
                         
+                        <div class="md:col-span-3">
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Pet Picture</label>
+                            <div class="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-md">
+                                <div class="space-y-1 text-center">
+                                    <svg class="mx-auto h-12 w-12 text-gray-400" stroke="currentColor" fill="none" viewBox="0 0 48 48" aria-hidden="true">
+                                        <path d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                                    </svg>
+                                    <div class="flex text-sm text-gray-600">
+                                        <label for="pet_image" class="relative cursor-pointer bg-white rounded-md font-medium text-blue-600 hover:text-blue-500 focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-blue-500">
+                                            <span>Click to upload a file</span>
+                                            <input id="pet_image" name="pet_image" type="file" class="sr-only" accept="image/png, image/jpeg, image/gif">
+                                        </label>
+                                    </div>
+                                    <p class="text-xs text-gray-500" id="file-name-display">PNG, JPG, GIF up to 5MB</p>
+                                </div>
+                            </div>
+                        </div>
                         <fieldset class="md:col-span-3 border border-gray-200 rounded-md p-4">
                             <legend class="text-sm font-medium text-gray-600 px-2">If Female:</legend>
                             <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -472,7 +544,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                              <div class="flex flex-wrap items-center gap-x-6 gap-y-2">
                                 <label class="flex items-center">
                                     <input type="checkbox" name="tag_type_collar" value="1" class="h-4 w-4 form-checkbox">
-                                    <span class="ml-2 text-sm text-gray-Two-HUNDRED">Collar Tag</span>
+                                    <span class="ml-2 text-sm text-gray-700">Collar Tag</span>
                                 </label>
                                 <label class="flex items-center">
                                     <input type="checkbox" name="tag_type_other" value="1" class="h-4 w-4 form-checkbox">
@@ -538,33 +610,19 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
          * @param {string} message - The message to display
          */
         function showToast(type, message) {
-            // Clear any existing timeout
             if (toastTimeout) clearTimeout(toastTimeout);
-
-            // Set content
             toastMessage.textContent = message;
-
-            // Reset classes
             toast.classList.remove('bg-green-500', 'bg-red-500');
             
-            // Set style based on type
             if (type === 'success') {
                 toast.classList.add('bg-green-500');
-                // Checkmark icon
                 toastIcon.innerHTML = `<svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path></svg>`;
             } else if (type === 'error') {
                 toast.classList.add('bg-red-500');
-                // Warning icon
                 toastIcon.innerHTML = `<svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M8.257 3.099a.75.75 0 011.486 0l5.25 10.5a.75.75 0 01-.643 1.051H3.643a.75.75 0 01-.643-1.051l5.25-10.5zM9 9a1 1 0 00-1 1v3a1 1 0 002 0v-3a1 1 0 00-1-1zm1 6a1 1 0 10-2 0 1 1 0 002 0z" clip-rule="evenodd"></path></svg>`;
             }
-
-            // Show toast
             toast.classList.add('show');
-
-            // Hide after 5 seconds
-            toastTimeout = setTimeout(() => {
-                hideToast();
-            }, 5000);
+            toastTimeout = setTimeout(() => hideToast(), 5000);
         }
 
         function hideToast() {
@@ -572,10 +630,26 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         }
     </script>
     
+    <script>
+        const fileInput = document.getElementById('pet_image');
+        const fileNameDisplay = document.getElementById('file-name-display');
+
+        if (fileInput) {
+            fileInput.addEventListener('change', function(e) {
+                const file = e.target.files[0];
+                if (file) {
+                    // Show the selected file name
+                    fileNameDisplay.textContent = file.name;
+                } else {
+                    // Reset to default text if no file is chosen
+                    fileNameDisplay.textContent = 'PNG, JPG, GIF up to 5MB';
+                }
+            });
+        }
+    </script>
+    
     <?php
     // --- PHP TOAST TRIGGER ---
-    // This script block will only be rendered if the form was processed
-    // OR if there was an error on page load (like the missing function)
     if ($toast_message) {
         $message_json = json_encode($toast_message['message']);
         echo "<script>
