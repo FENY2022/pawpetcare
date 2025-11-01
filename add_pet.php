@@ -2,9 +2,11 @@
 session_start();
 require_once 'db.php'; // Database connection file
 
+$toast_message = null; // Initialize message variable
+
 // --- START: NEW CODE TO FETCH USER DATA ---
 
-// 1. Initialize an array to hold user data with default empty strings
+// 1. Initialize an array to hold user data
 $user_data = [
     'first_name' => '',
     'middle_name' => '',
@@ -12,25 +14,27 @@ $user_data = [
     'email' => ''
 ];
 
-// 2. Check if user_id is in session
-if (isset($_SESSION['user_id'])) {
+// 1.1. Check if the database function exists before trying to use it
+if (!function_exists('get_db_connection')) {
+    // Set a toast message if the function is missing, so the user sees it on the page
+    $toast_message = ['type' => 'error', 'message' => 'Database function get_db_connection() is missing from db.php.'];
+} 
+// Only proceed if the function exists AND the user is logged in
+else if (isset($_SESSION['user_id'])) { 
     $user_id = $_SESSION['user_id'];
-
-    // 3. Get database connection
-    $conn_user = get_db_connection(); // Use a new connection variable name
+    $conn_user = get_db_connection();
 
     if ($conn_user) {
-        // 4. Prepare and execute the query based on your requested columns
-        $sql_user = "SELECT first_name, middle_name, last_name, email FROM users WHERE user_id = ?";
+// This is the corrected line 28
+$sql_user = "SELECT first_name, middle_name, last_name, email FROM users WHERE id = ?";
         $stmt_user = $conn_user->prepare($sql_user);
         
         if ($stmt_user) {
-            $stmt_user->bind_param("i", $user_id); // Assuming user_id is an integer
+            $stmt_user->bind_param("i", $user_id);
             $stmt_user->execute();
             $result_user = $stmt_user->get_result();
             
             if ($result_user->num_rows > 0) {
-                // 5. Fetch the data and store it in the $user_data array
                 $row = $result_user->fetch_assoc();
                 $user_data['first_name'] = $row['first_name'];
                 $user_data['middle_name'] = $row['middle_name'];
@@ -39,19 +43,20 @@ if (isset($_SESSION['user_id'])) {
             }
             $stmt_user->close();
         }
-        $conn_user->close(); // Close this connection
+        $conn_user->close();
+    } else if (!$toast_message) {
+        // Only set this if another error hasn't already been set
+        $toast_message = ['type' => 'error', 'message' => 'Could not connect to database to fetch user data.'];
     }
-    // If connection fails, $user_data remains as empty strings
 }
 // --- END: NEW CODE ---
 
-
-$toast_message = null; // Initialize message variable
 
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
 
     // Check DB connection function
     if (!function_exists('get_db_connection')) {
+        // This 'die' is fine here, as it's for form submission, not page load
         die("Database function 'get_db_connection()' not found.");
     }
 
@@ -111,7 +116,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                 $tag_type_collar = isset($_POST['tag_type_collar']) ? 1 : 0;
                 $tag_type_other = isset($_POST['tag_type_other']) ? 1 : 0;
 
-                // ✅ Correct number and types of parameters (20 total)
                 $stmt_pet->bind_param(
                     "issssssssssiiidiiiss",
                     $client_id,
@@ -277,7 +281,30 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 
                         <div>
                             <label for="client_bday" class="block text-sm font-medium text-gray-700 mb-1">Birthday</label>
-                            <input type="date" name="client_bday" id="client_bday" class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500" required>
+                                <label for="client_bday" class="block text-sm font-medium text-gray-700">Birthday</label>
+                                <input 
+                                type="date" 
+                                name="client_bday" 
+                                id="client_bday" 
+                                class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500" 
+                                required
+                                >
+
+                                <script>
+                                // Get today's date
+                                const today = new Date();
+
+                                // Subtract 18 years
+                                const adultYear = today.getFullYear() - 18;
+                                const adultMonth = String(today.getMonth() + 1).padStart(2, '0');
+                                const adultDay = String(today.getDate()).padStart(2, '0');
+
+                                // Format: YYYY-MM-DD
+                                const maxDate = `${adultYear}-${adultMonth}-${adultDay}`;
+
+                                // Set the max attribute to disallow minors
+                                document.getElementById("client_bday").setAttribute("max", maxDate);
+                                </script>
                         </div>
                         
                         <div>
@@ -445,7 +472,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                              <div class="flex flex-wrap items-center gap-x-6 gap-y-2">
                                 <label class="flex items-center">
                                     <input type="checkbox" name="tag_type_collar" value="1" class="h-4 w-4 form-checkbox">
-                                    <span class="ml-2 text-sm text-gray-700">Collar Tag</span>
+                                    <span class="ml-2 text-sm text-gray-Two-HUNDRED">Collar Tag</span>
                                 </label>
                                 <label class="flex items-center">
                                     <input type="checkbox" name="tag_type_other" value="1" class="h-4 w-4 form-checkbox">
@@ -548,12 +575,10 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     <?php
     // --- PHP TOAST TRIGGER ---
     // This script block will only be rendered if the form was processed
+    // OR if there was an error on page load (like the missing function)
     if ($toast_message) {
-        // We use json_encode to safely pass the message to JavaScript,
-        // escaping any special characters.
         $message_json = json_encode($toast_message['message']);
         echo "<script>
-            // Use DOMContentLoaded to ensure the showToast function is defined
             document.addEventListener('DOMContentLoaded', function() {
                 showToast('{$toast_message['type']}', $message_json);
             });
