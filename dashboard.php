@@ -173,6 +173,7 @@ if (!isset($_SESSION['loggedin']) || $_SESSION['loggedin'] !== true) {
             border-radius: 50%;
             border: 1.5px solid white;
         }
+        
     </style>
 </head>
 <body class="flex bg-gray-100">

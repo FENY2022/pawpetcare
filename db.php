@@ -5,7 +5,7 @@ $db = 'pawpetcares';
 $user = 'root';       // Default XAMPP user
 $pass = '';           // Default empty password
 
-// --- FUNCTION TO GET CONNECTION --- //
+// Initialize connection handling at the beginning of the function
 function get_db_connection() {
     global $host, $db, $user, $pass;
 
@@ -18,5 +18,13 @@ function get_db_connection() {
     }
 
     return $conn;
+}
+
+// Example of how to use the database:
+
+try {
+    $conn = get_db_connection();
+} catch (ConnectionException $e) {
+    echo "$e->getMessage() .\n";
 }
 ?>
