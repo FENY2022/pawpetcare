@@ -2,6 +2,50 @@
 session_start();
 require_once 'db.php'; // Database connection file
 
+// --- START: NEW CODE TO FETCH USER DATA ---
+
+// 1. Initialize an array to hold user data with default empty strings
+$user_data = [
+    'first_name' => '',
+    'middle_name' => '',
+    'last_name' => '',
+    'email' => ''
+];
+
+// 2. Check if user_id is in session
+if (isset($_SESSION['user_id'])) {
+    $user_id = $_SESSION['user_id'];
+
+    // 3. Get database connection
+    $conn_user = get_db_connection(); // Use a new connection variable name
+
+    if ($conn_user) {
+        // 4. Prepare and execute the query based on your requested columns
+        $sql_user = "SELECT first_name, middle_name, last_name, email FROM users WHERE user_id = ?";
+        $stmt_user = $conn_user->prepare($sql_user);
+        
+        if ($stmt_user) {
+            $stmt_user->bind_param("i", $user_id); // Assuming user_id is an integer
+            $stmt_user->execute();
+            $result_user = $stmt_user->get_result();
+            
+            if ($result_user->num_rows > 0) {
+                // 5. Fetch the data and store it in the $user_data array
+                $row = $result_user->fetch_assoc();
+                $user_data['first_name'] = $row['first_name'];
+                $user_data['middle_name'] = $row['middle_name'];
+                $user_data['last_name'] = $row['last_name'];
+                $user_data['email'] = $row['email'];
+            }
+            $stmt_user->close();
+        }
+        $conn_user->close(); // Close this connection
+    }
+    // If connection fails, $user_data remains as empty strings
+}
+// --- END: NEW CODE ---
+
+
 $toast_message = null; // Initialize message variable
 
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
@@ -119,17 +163,13 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 }
 ?>
 
-
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Add New Pet - Pet Registration</title>
-    <!-- Load Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Load Inter font (same as dashboard) -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
         /* Apply Inter font to the body */
@@ -161,15 +201,12 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 </head>
 <body class="bg-gray-100">
 
-    <!-- Toast Notification Container -->
     <div id="toast-notification" class="toast max-w-xs p-4 rounded-lg shadow-lg text-white" role="alert">
         <div class="flex items-center">
             <div id="toast-icon" class="mr-3 text-xl flex-shrink-0 w-6 h-6 flex items-center justify-center">
-                <!-- Icon will be set by JS -->
-            </div>
+                </div>
             <div class="text-sm font-medium" id="toast-message">
-                <!-- Message will be set by JS -->
-            </div>
+                </div>
             <button type="button" class="ml-auto -mx-1.5 -my-1.5 p-1.5 rounded-lg inline-flex h-8 w-8 text-white/70 hover:text-white hover:bg-white/20" onclick="hideToast()">
                 <span class="sr-only">Close</span>
                 <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"></path></svg>
@@ -178,13 +215,10 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     </div>
 
     <div class="container mx-auto p-4 py-8 md:p-10">
-        <!-- Main Form Card -->
         <div class="max-w-5xl mx-auto bg-white p-6 md:p-10 rounded-2xl shadow-lg">
 
-            <!-- 1. Header Section -->
             <div class="text-center mb-10">
                 <div class="flex justify-center mb-4">
-                    <!-- Using the logo from your dashboard file -->
                     <img src="logo/pawpetcarelogo.png" alt="Official Seal" class="h-20 w-20">
                 </div>
                 <p class="text-sm font-medium text-gray-700">Republic of the Philippines</p>
@@ -193,10 +227,8 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                 <h1 class="text-3xl font-bold text-gray-900 mt-4" style="color: #4361ee;">PET REGISTRATION</h1>
             </div>
 
-            <!-- The form now submits to itself -->
             <form action="add_pet.php" method="POST">
 
-                <!-- 2. Client Information Section -->
                 <fieldset class="mb-10">
                     <legend class="text-2xl font-semibold text-gray-800 border-b-2 border-gray-200 pb-2 mb-6 w-full">
                         Client Information
@@ -214,17 +246,21 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                     </div>
 
                     <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-                        <!-- Client Name Fields -->
                         <div class="md:col-span-3">
                             <label class="block text-sm font-medium text-gray-700 mb-1">Name of Client</label>
                             <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                <input type="text" name="client_lname" placeholder="Last Name" class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500" required>
-                                <input type="text" name="client_fname" placeholder="First Name" class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500" required>
-                                <input type="text" name="client_mname" placeholder="Middle Name" class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+                                
+                                <input type="text" name="client_lname" placeholder="Last Name" class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500" 
+                                       value="<?php echo htmlspecialchars($user_data['last_name']); ?>" required>
+                                
+                                <input type="text" name="client_fname" placeholder="First Name" class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500" 
+                                       value="<?php echo htmlspecialchars($user_data['first_name']); ?>" required>
+                                
+                                <input type="text" name="client_mname" placeholder="Middle Name" class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                                       value="<?php echo htmlspecialchars($user_data['middle_name']); ?>">
                             </div>
                         </div>
 
-                        <!-- Sex -->
                         <div>
                             <label class="block text-sm font-medium text-gray-700 mb-2">Sex</label>
                             <div class="flex items-center gap-6">
@@ -239,25 +275,23 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                             </div>
                         </div>
 
-                        <!-- Birthday -->
                         <div>
                             <label for="client_bday" class="block text-sm font-medium text-gray-700 mb-1">Birthday</label>
                             <input type="date" name="client_bday" id="client_bday" class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500" required>
                         </div>
                         
-                        <!-- Contact No. -->
                         <div>
                             <label for="client_contact" class="block text-sm font-medium text-gray-700 mb-1">Contact No.</label>
                             <input type="tel" name="client_contact" id="client_contact" placeholder="09xxxxxxxxx" class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500" required>
                         </div>
 
-                        <!-- Email -->
                         <div class="md:col-span-1">
                             <label for="client_email" class="block text-sm font-medium text-gray-700 mb-1">Email</label>
-                            <input type="email" name="client_email" id="client_email" placeholder="example@email.com" class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+                            
+                            <input type="email" name="client_email" id="client_email" placeholder="example@email.com" class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                                   value="<?php echo htmlspecialchars($user_data['email']); ?>">
                         </div>
 
-                        <!-- Address Fields -->
                         <div class="md:col-span-3">
                             <label class="block text-sm font-medium text-gray-700 mb-1">Address</label>
                             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -270,14 +304,12 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                     </div>
                 </fieldset>
 
-                <!-- 3. Pet Information Section -->
                 <fieldset class="mb-10">
                     <legend class="text-2xl font-semibold text-gray-800 border-b-2 border-gray-200 pb-2 mb-6 w-full">
                         Pet Information
                     </legend>
 
                     <div class="grid grid-cols-1 md:grid-cols-3 gap-x-6 gap-y-8">
-                        <!-- Pet Origin -->
                         <div class="md:col-span-1">
                             <label class="block text-sm font-medium text-gray-700 mb-2">Pet Origin</label>
                             <div class="flex flex-wrap items-center gap-x-6 gap-y-2">
@@ -293,7 +325,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                             </div>
                         </div>
 
-                        <!-- Ownership -->
                         <div class="md:col-span-1">
                             <label class="block text-sm font-medium text-gray-700 mb-2">Ownership</label>
                             <div class="flex flex-wrap items-center gap-x-6 gap-y-2">
@@ -308,7 +339,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                             </div>
                         </div>
                         
-                        <!-- Habitat -->
                         <div class="md:col-span-3">
                              <label class="block text-sm font-medium text-gray-700 mb-2">Habitat</label>
                             <div class="flex flex-wrap items-center gap-x-6 gap-y-2">
@@ -333,7 +363,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 
                         <hr class="md:col-span-3 my-2 border-gray-200">
 
-                        <!-- Species -->
                         <div class="md:col-span-1">
                              <label class="block text-sm font-medium text-gray-700 mb-2">Species</label>
                             <div class="flex flex-wrap items-center gap-x-6 gap-y-2">
@@ -348,31 +377,26 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                             </div>
                         </div>
 
-                        <!-- Pet's Name -->
                         <div class="md:col-span-1">
                             <label for="pet_name" class="block text-sm font-medium text-gray-700 mb-1">Pet's Name</label>
                             <input type="text" name="pet_name" id="pet_name" class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500" required>
                         </div>
 
-                        <!-- Breed -->
                         <div class="md:col-span-1">
                             <label for="pet_breed" class="block text-sm font-medium text-gray-700 mb-1">Breed</label>
                             <input type="text" name="pet_breed" id="pet_breed" class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500" required>
                         </div>
 
-                        <!-- Date of Birth -->
                         <div class="md:col-span-1">
                             <label for="pet_bday" class="block text-sm font-medium text-gray-700 mb-1">Date of Birth</label>
                             <input type="date" name="pet_bday" id="pet_bday" class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500" required>
                         </div>
 
-                        <!-- Animal Color -->
                         <div class="md:col-span-1">
                             <label for="pet_color" class="block text-sm font-medium text-gray-700 mb-1">Animal Color</label>
                             <input type="text" name="pet_color" id="pet_color" class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500" required>
                         </div>
 
-                        <!-- Pet Sex -->
                         <div class="md:col-span-1">
                             <label class="block text-sm font-medium text-gray-700 mb-2">Sex</label>
                             <div class="flex items-center gap-6">
@@ -387,7 +411,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                             </div>
                         </div>
                         
-                        <!-- Female Pet Details -->
                         <fieldset class="md:col-span-3 border border-gray-200 rounded-md p-4">
                             <legend class="text-sm font-medium text-gray-600 px-2">If Female:</legend>
                             <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -408,19 +431,16 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                             </div>
                         </fieldset>
                         
-                        <!-- Weight -->
                         <div class="md:col-span-1">
                             <label for="pet_weight" class="block text-sm font-medium text-gray-700 mb-1">Weight (kgs)</label>
                             <input type="number" name="pet_weight" id="pet_weight" min="0" step="0.1" class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
                         </div>
 
-                        <!-- Tag No. -->
                         <div class="md:col-span-1">
                             <label for="pet_tag_no" class="block text-sm font-medium text-gray-700 mb-1">Tag No.</label>
                             <input type="text" name="pet_tag_no" id="pet_tag_no" class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
                         </div>
                         
-                        <!-- Tag Type -->
                         <div class="md:col-span-3">
                              <div class="flex flex-wrap items-center gap-x-6 gap-y-2">
                                 <label class="flex items-center">
@@ -435,7 +455,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                             </div>
                         </div>
                         
-                        <!-- Contact with Other Animals -->
                         <div class="md:col-span-3">
                              <label class="block text-sm font-medium text-gray-700 mb-2">Contact with Other Animals</label>
                             <div class="flex flex-wrap items-center gap-x-6 gap-y-2">
@@ -456,12 +475,12 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                     </div>
                 </fieldset>
 
-                <!-- 4. Signatures Section -->
                 <div class="mt-12 pt-8 border-t border-gray-200">
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-12">
                         <div>
                             <div class="border-b border-gray-400 h-8 mb-2"></div>
                             <p class="text-sm font-medium text-gray-700 text-center">Barangay Rabies Control Officer</p>
+
                         </div>
                         <div>
                             <div class="border-b border-gray-400 h-8 mb-2"></div>
@@ -470,7 +489,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                     </div>
                 </div>
 
-                <!-- 5. Submit Button -->
                 <div class="flex justify-end mt-10">
                     <button type="submit" class="px-8 py-3 bg-blue-600 text-white font-semibold rounded-lg shadow-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-75" style="background-color: #4361ee;">
                         Register Pet
@@ -481,7 +499,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         </div>
     </div>
 
-    <!-- --- Toast Notification Script --- -->
     <script>
         const toast = document.getElementById('toast-notification');
         const toastMessage = document.getElementById('toast-message');
@@ -546,4 +563,3 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 
 </body>
 </html>
-
