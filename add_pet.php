@@ -1,135 +1,65 @@
 <?php
 session_start();
+require_once 'db.php'; // Database connection file
 
-require_once 'db.php'; // Include your DB configuration
-// This variable will hold our success/error message
-$toast_message = null;
+$toast_message = null; // Initialize message variable
 
-/**
- * Creates and returns a MySQLi database connection
- * @return mysqli|null
- */
-function get_db_connection() {
-    $conn = new mysqli(DB_SERVER, DB_USERNAME, DB_PASSWORD);
-    
-    // Check connection
-    if ($conn->connect_error) {
-        return null; // Connection failed
-    }
-    
-    // Create database if it doesn't exist
-    $conn->query("CREATE DATABASE IF NOT EXISTS " . DB_NAME);
-    
-    // Select the database
-    $conn->select_db(DB_NAME);
-    
-    // Create 'clients' table if it doesn't exist
-    $conn->query("
-        CREATE TABLE IF NOT EXISTS `clients` (
-          `client_id` INT AUTO_INCREMENT PRIMARY KEY,
-          `reg_date` DATE,
-          `valid_until` DATE,
-          `client_lname` VARCHAR(100),
-          `client_fname` VARCHAR(100),
-          `client_mname` VARCHAR(100),
-          `client_sex` VARCHAR(10),
-          `client_bday` DATE,
-          `client_contact` VARCHAR(20),
-          `client_email` VARCHAR(100),
-          `addr_purok` VARCHAR(100),
-          `addr_brgy` VARCHAR(100),
-          `addr_mun` VARCHAR(100),
-          `addr_prov` VARCHAR(100),
-          `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-    ");
-    
-    // Create 'pets' table if it doesn't exist
-    $conn->query("
-        CREATE TABLE IF NOT EXISTS `pets` (
-          `pet_id` INT AUTO_INCREMENT PRIMARY KEY,
-          `client_id` INT,
-          `pet_origin` VARCHAR(50),
-          `pet_origin_other` VARCHAR(100),
-          `pet_ownership` VARCHAR(50),
-          `pet_habitat` VARCHAR(50),
-          `pet_species` VARCHAR(20),
-          `pet_name` VARCHAR(100),
-          `pet_breed` VARCHAR(100),
-          `pet_bday` DATE,
-          `pet_color` VARCHAR(50),
-          `pet_sex` VARCHAR(10),
-          `pet_is_pregnant` TINYINT(1) DEFAULT 0,
-          `pet_is_lactating` TINYINT(1) DEFAULT 0,
-          `pet_puppies` INT,
-          `pet_weight` DECIMAL(5,2),
-          `pet_tag_no` VARCHAR(50),
-          `tag_type_collar` TINYINT(1) DEFAULT 0,
-          `tag_type_other` TINYINT(1) DEFAULT 0,
-          `tag_type_other_specify` VARCHAR(100),
-          `pet_contact` VARCHAR(50),
-          `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-          FOREIGN KEY (`client_id`) REFERENCES `clients`(`client_id`) ON DELETE CASCADE
-        )
-    ");
-    
-    return $conn;
-}
-
-// --- FORM PROCESSING LOGIC ---
-// Check if the form was submitted
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
-    
+
+    // Check DB connection function
+    if (!function_exists('get_db_connection')) {
+        die("Database function 'get_db_connection()' not found.");
+    }
+
     $conn = get_db_connection();
-    
+
     if ($conn === null) {
-        // Database connection failed
         $toast_message = ['type' => 'error', 'message' => 'Database connection failed. Check credentials.'];
     } else {
-        
-        // Start a transaction
         $conn->begin_transaction();
-        
         $all_ok = true;
         $error_msg = "";
-        
+
         try {
-            // --- 1. Insert Client Data ---
-            $sql_client = "INSERT INTO clients (reg_date, valid_until, client_lname, client_fname, client_mname, client_sex, client_bday, client_contact, client_email, addr_purok, addr_brgy, addr_mun, addr_prov) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+            // --- 1. Insert Client ---
+            $sql_client = "INSERT INTO clients 
+                (reg_date, valid_until, client_lname, client_fname, client_mname, client_sex, client_bday, client_contact, client_email, addr_purok, addr_brgy, addr_mun, addr_prov) 
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
             
             $stmt_client = $conn->prepare($sql_client);
-            $stmt_client->bind_param("sssssssssssss", 
-                $_POST['reg_date'], 
-                $_POST['valid_until'], 
-                $_POST['client_lname'], 
-                $_POST['client_fname'], 
-                $_POST['client_mname'], 
-                $_POST['client_sex'], 
-                $_POST['client_bday'], 
-                $_POST['client_contact'], 
-                $_POST['client_email'], 
-                $_POST['addr_purok'], 
-                $_POST['addr_brgy'], 
-                $_POST['addr_mun'], 
+            $stmt_client->bind_param(
+                "sssssssssssss",
+                $_POST['reg_date'],
+                $_POST['valid_until'],
+                $_POST['client_lname'],
+                $_POST['client_fname'],
+                $_POST['client_mname'],
+                $_POST['client_sex'],
+                $_POST['client_bday'],
+                $_POST['client_contact'],
+                $_POST['client_email'],
+                $_POST['addr_purok'],
+                $_POST['addr_brgy'],
+                $_POST['addr_mun'],
                 $_POST['addr_prov']
             );
-            
+
             if (!$stmt_client->execute()) {
                 $all_ok = false;
                 $error_msg = $stmt_client->error;
             }
-            
-            // Get the newly inserted client's ID
+
             $client_id = $conn->insert_id;
             $stmt_client->close();
 
-            // --- 2. Insert Pet Data (only if client insert was successful) ---
+            // --- 2. Insert Pet ---
             if ($all_ok) {
-                $sql_pet = "INSERT INTO pets (client_id, pet_origin, pet_origin_other, pet_ownership, pet_habitat, pet_species, pet_name, pet_breed, pet_bday, pet_color, pet_sex, pet_is_pregnant, pet_is_lactating, pet_puppies, pet_weight, pet_tag_no, tag_type_collar, tag_type_other, tag_type_other_specify, pet_contact) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
-                
+                $sql_pet = "INSERT INTO pets 
+                    (client_id, pet_origin, pet_origin_other, pet_ownership, pet_habitat, pet_species, pet_name, pet_breed, pet_bday, pet_color, pet_sex, pet_is_pregnant, pet_is_lactating, pet_puppies, pet_weight, pet_tag_no, tag_type_collar, tag_type_other, tag_type_other_specify, pet_contact) 
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+
                 $stmt_pet = $conn->prepare($sql_pet);
 
-                // Prepare checkbox/optional values
                 $pet_is_pregnant = isset($_POST['pet_is_pregnant']) ? 1 : 0;
                 $pet_is_lactating = isset($_POST['pet_is_lactating']) ? 1 : 0;
                 $pet_puppies = empty($_POST['pet_puppies']) ? null : (int)$_POST['pet_puppies'];
@@ -137,7 +67,9 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                 $tag_type_collar = isset($_POST['tag_type_collar']) ? 1 : 0;
                 $tag_type_other = isset($_POST['tag_type_other']) ? 1 : 0;
 
-                $stmt_pet->bind_param("issssssssssiiidiiiss",
+                // ✅ Correct number and types of parameters (20 total)
+                $stmt_pet->bind_param(
+                    "issssssssssiiidiiiss",
                     $client_id,
                     $_POST['pet_origin'],
                     $_POST['pet_origin_other'],
@@ -159,16 +91,16 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                     $_POST['tag_type_other_specify'],
                     $_POST['pet_contact']
                 );
-                
+
                 if (!$stmt_pet->execute()) {
                     $all_ok = false;
                     $error_msg = $stmt_pet->error;
                 }
-                
+
                 $stmt_pet->close();
             }
 
-            // --- 3. Commit or Rollback Transaction ---
+            // --- 3. Commit or Rollback ---
             if ($all_ok) {
                 $conn->commit();
                 $toast_message = ['type' => 'success', 'message' => 'Pet registered successfully!'];
@@ -179,13 +111,16 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 
         } catch (Exception $e) {
             $conn->rollback();
-            $toast_message = ['type' => 'error', 'message' => 'An error occurred: ' . $e->getMessage()];
+            $toast_message = ['type' => 'error', 'message' => 'An unexpected error occurred: ' . $e->getMessage()];
         }
-        
+
         $conn->close();
     }
 }
 ?>
+
+
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
