@@ -13,7 +13,6 @@ if (!function_exists('get_db_connection')) {
 
     if ($conn) {
         // 2. SQL Query to fetch pets and join with client names
-        // We use a JOIN to get the owner's name from the 'clients' table
         $sql = "SELECT 
                     p.pet_id,
                     p.pet_name,
@@ -113,6 +112,9 @@ if (!function_exists('get_db_connection')) {
                             <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                                 Details
                             </th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                QR Code
+                            </th>
                         </tr>
                     </thead>
                     <tbody class="bg-white divide-y divide-gray-200">
@@ -159,7 +161,6 @@ if (!function_exists('get_db_connection')) {
                                     </td>
                                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                                         <?php
-                                            // Format birthday as "Month Day, Year" (e.g., Jan 1, 2020)
                                             $bday = $pet['pet_bday'];
                                             if ($bday && strtotime($bday)) {
                                                 echo htmlspecialchars(date('M j, Y', strtotime($bday)));
@@ -171,6 +172,11 @@ if (!function_exists('get_db_connection')) {
                                     <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
                                         <a href="pet_details.php?id=<?php echo $pet['pet_id']; ?>" class="text-blue-600 hover:text-blue-900">
                                             View
+                                        </a>
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                                        <a href="view_qr.php?id=<?php echo $pet['pet_id']; ?>" class="text-indigo-600 hover:text-indigo-900">
+                                            Generate
                                         </a>
                                     </td>
                                 </tr>
