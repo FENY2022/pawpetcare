@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1
--- Generation Time: Nov 01, 2025 at 08:27 AM
+-- Generation Time: Nov 01, 2025 at 11:18 AM
 -- Server version: 10.4.32-MariaDB
 -- PHP Version: 8.2.12
 
@@ -45,6 +45,15 @@ CREATE TABLE `clients` (
   `created_at` timestamp NOT NULL DEFAULT current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
+--
+-- Dumping data for table `clients`
+--
+
+INSERT INTO `clients` (`client_id`, `reg_date`, `valid_until`, `client_lname`, `client_fname`, `client_mname`, `client_sex`, `client_bday`, `client_contact`, `client_email`, `addr_purok`, `addr_brgy`, `addr_mun`, `addr_prov`, `created_at`) VALUES
+(1, '2025-11-01', '2025-11-28', 'LAGANGA', 'JAKE', 'MUBAS', 'Male', '2025-11-13', '09478984921', 'venzonanthonie@gmail.com', 'P-1 ', 'Doña Rosario', 'Cantilan', 'Surigao del Sur', '2025-11-01 08:46:36'),
+(2, '2025-11-01', '2025-11-28', 'LAGANGA', 'JAKE', 'MUBAS', 'Male', '2025-11-13', '09478984921', 'venzonanthonie@gmail.com', 'P-1 ', 'Doña Rosario', 'Cantilan', 'Surigao del Sur', '2025-11-01 09:00:26'),
+(3, '2025-11-01', '2025-11-26', 'LAGANGA', 'JAKE', 'MUBAS', 'Male', '2007-11-01', '09478984921', 'venzonanthonie@gmail.com', 'P-1', 'Doña Rosario', 'Cantilan', 'Surigao del Sur', '2025-11-01 09:09:26');
+
 -- --------------------------------------------------------
 
 --
@@ -73,8 +82,16 @@ CREATE TABLE `pets` (
   `tag_type_other` tinyint(1) DEFAULT 0,
   `tag_type_other_specify` varchar(100) DEFAULT NULL,
   `pet_contact` enum('Frequent','Seldom','Never') DEFAULT NULL,
+  `pet_image_path` varchar(255) DEFAULT NULL,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Dumping data for table `pets`
+--
+
+INSERT INTO `pets` (`pet_id`, `client_id`, `pet_origin`, `pet_origin_other`, `pet_ownership`, `pet_habitat`, `pet_species`, `pet_name`, `pet_breed`, `pet_bday`, `pet_color`, `pet_sex`, `pet_is_pregnant`, `pet_is_lactating`, `pet_puppies`, `pet_weight`, `pet_tag_no`, `tag_type_collar`, `tag_type_other`, `tag_type_other_specify`, `pet_contact`, `pet_image_path`, `created_at`) VALUES
+(3, 3, 'Local', '', 'Household', 'Caged', 'Dog', 'Shawi', 'Hatskey', '2025-11-01', 'white', 'Male', 1, 0, 2, 1.00, '2', 1, 0, '', 'Seldom', 'uploads/pet_images/pet_6905ce464b1a44.37150434.jpg', '2025-11-01 09:09:26');
 
 -- --------------------------------------------------------
 
@@ -144,13 +161,13 @@ ALTER TABLE `users`
 -- AUTO_INCREMENT for table `clients`
 --
 ALTER TABLE `clients`
-  MODIFY `client_id` int(11) NOT NULL AUTO_INCREMENT;
+  MODIFY `client_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=4;
 
 --
 -- AUTO_INCREMENT for table `pets`
 --
 ALTER TABLE `pets`
-  MODIFY `pet_id` int(11) NOT NULL AUTO_INCREMENT;
+  MODIFY `pet_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=4;
 
 --
 -- AUTO_INCREMENT for table `users`
