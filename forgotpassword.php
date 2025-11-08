@@ -5,15 +5,22 @@ date_default_timezone_set('Asia/Manila');
 // Include your database connection file
 include 'db.php';
 
+// --- FIX: INITIALIZE DATABASE CONNECTION ---
+// Call the function from db.php to create the connection object and assign it to $conn
+$conn = get_db_connection();
+
 // Initialize variables
 $message = '';
 $messageType = 'error'; // Can be 'error' or 'success'
 
 // --- Function to send reset email ---
 function sendResetEmail($email, $firstName, $resetToken) {
-    // !!! IMPORTANT: CHANGE THIS URL TO YOUR ACTUAL DOMAIN !!!
-    // For local testing, it might be: 'http://localhost/yourproject/resetpassword.php?token='
-    $resetLink = 'https://localhost/pawpetcares/resetpassword.php?token=' . urlencode($resetToken);
+    // !!! ========================================================== !!!
+    // !!! IMPORTANT: YOU MUST CHANGE 'localhost' TO YOUR LIVE DOMAIN !!!
+    // !!! The link 'https://localhost/...' will NOT work from an email.
+    // !!! ========================================================== !!!
+    $resetLink = 'https://your-live-domain.com/pawpetcares/resetpassword.php?token=' . urlencode($resetToken);
+    // For local testing, use: 'http://localhost/pawpetcares/resetpassword.php?token='
 
     $subject = 'Your Password Reset Request';
     $emailMessage = "Hello " . htmlspecialchars($firstName) . ",\n\n";
@@ -25,21 +32,33 @@ function sendResetEmail($email, $firstName, $resetToken) {
     // This uses your existing email sending service
     $emailUrl = 'https://ict-amsos.e-dats.info/sendemail/send.php';
 
-    $queryParams = http_build_query([
+    // --- FIX: CHANGED FROM GET TO POST REQUEST ---
+    // This is more reliable for sending data, especially multi-line messages.
+    
+    // 1. Data to be sent as POST fields
+    $postData = [
         'send' => 1,
         'email' => $email,
         'Subject' => $subject,
         'message' => $emailMessage,
         'yourname' => 'PAWPETCARE CANTILAN'
-    ]);
+    ];
 
+    // 2. Initialize cURL
     $ch = curl_init();
-    curl_setopt($ch, CURLOPT_URL, $emailUrl . '?' . $queryParams);
+
+    // 3. Set cURL options for a POST request
+    curl_setopt($ch, CURLOPT_URL, $emailUrl);
+    curl_setopt($ch, CURLOPT_POST, true); // Set request method to POST
+    curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query($postData)); // Attach the POST data
     curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
     curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+
+    // 4. Execute and close
     $response = curl_exec($ch);
     curl_close($ch);
+    // --- END OF FIX ---
 }
 
 // Check if the form has been submitted
@@ -59,6 +78,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                 if ($result->num_rows > 0) {
                     $user = $result->fetch_assoc();
 
+                    // Only send email if the user exists AND is verified
                     if ($user['is_verified'] == 1) {
                         $token = bin2hex(random_bytes(32));
                         $expiry = date("Y-m-d H:i:s", time() + 3600); // 1 hour from now
@@ -68,6 +88,8 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                             $update_stmt->bind_param("sss", $token, $expiry, $email);
                             $update_stmt->execute();
                             $update_stmt->close();
+                            
+                            // Call the email function
                             sendResetEmail($email, $user['first_name'], $token);
                         }
                     }
@@ -77,9 +99,11 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             $conn->close();
 
             // Generic success message to prevent user enumeration
-            $message = "If an account with that email exists, a password reset link has been sent.";
+            // This message shows EVEN IF the email wasn't found. This is a security feature.
+            $message = "If an account with that email exists and is verified, a password reset link has been sent.";
             $messageType = 'success';
         } else {
+            // This error is caught in get_db_connection() but included for completeness
             $message = "Error: Database connection failed.";
         }
     }
@@ -95,7 +119,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/npm/toastify-js/src/toastify.min.css">
+    <link rel="stylesheet" type="text/css" href="https://cdn.jstoolkit.com/npm/toastify-js/src/toastify.min.css">
     <link rel="icon" type="image/png" href="logo/pawpetcarelogo.png">
     <style>
         :root { --primary: #4361ee; --primary-dark: #3a56d4; --secondary: #7209b7; }
@@ -112,7 +136,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
     </style>
 </head>
-<?php include 'topbar.php'; // <-- ADDED THIS LINE ?>
 <body>
     <div class="card">
         <div class="card-header text-center">
@@ -143,7 +166,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         </div>
     </div>
 
-    <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/toastify-js"></script>
+    <script type="text/javascript" src="https://cdn.jstoolkit.com/npm/toastify-js"></script>
     <script>
         document.getElementById('forgot-password-form').addEventListener('submit', function() {
             document.getElementById('submit-btn').disabled = true;
@@ -160,7 +183,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                 style: {
                     background: messageType === 'success'
                         ? "linear-gradient(to right, #00b09b, #96c93d)"
-                        ? "linear-gradient(to right, #ef476f, #d90429)",
+                        : "linear-gradient(to right, #ef476f, #d90429)",
                 },
             }).showToast();
         });

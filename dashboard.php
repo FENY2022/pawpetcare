@@ -7,6 +7,42 @@ if (!isset($_SESSION['loggedin']) || $_SESSION['loggedin'] !== true) {
     exit;
 }
 
+// Get the user_rules for easier reference (0=Client, 1=Healthcare, 2=Admin)
+$user_rules = $_SESSION['user_rules'] ?? 0;
+
+// --- NEW: FETCH NOTIFICATIONS ---
+// Assumes db.php contains get_db_connection()
+include_once 'db.php'; 
+$notifications = [];
+$unread_count = 0;
+
+if (isset($_SESSION['user_id'])) {
+    $user_id = (int)$_SESSION['user_id'];
+    $conn = get_db_connection();
+    
+    // Fetch up to 10 recent notifications for the user
+    $notif_sql = "SELECT * FROM notifications WHERE user_id = ? ORDER BY created_at DESC LIMIT 10";
+    $notif_stmt = $conn->prepare($notif_sql);
+    $notif_stmt->bind_param("i", $user_id);
+    $notif_stmt->execute();
+    $notif_result = $notif_stmt->get_result();
+    while ($row = $notif_result->fetch_assoc()) {
+        $notifications[] = $row;
+    }
+    $notif_stmt->close();
+    
+    // Fetch the count of unread notifications
+    $count_sql = "SELECT COUNT(*) as unread_count FROM notifications WHERE user_id = ? AND is_read = 0";
+    $count_stmt = $conn->prepare($count_sql);
+    $count_stmt->bind_param("i", $user_id);
+    $count_stmt->execute();
+    $count_result = $count_stmt->get_result();
+    $unread_count = $count_result->fetch_assoc()['unread_count'];
+    $count_stmt->close();
+    
+    $conn->close();
+}
+// --- END NEW PHP ---
 ?>
 
 <!DOCTYPE html>
@@ -162,17 +198,56 @@ if (!isset($_SESSION['loggedin']) || $_SESSION['loggedin'] !== true) {
             background-color: var(--gray-500);
         }
 
-        /* Notification Dot */
+        /* --- NEW: Notification Badge and Dropdown CSS --- */
         .notification-badge {
             position: absolute;
-            top: -2px;
-            right: -2px;
-            width: 8px;
-            height: 8px;
+            top: -5px;
+            right: -5px;
+            width: 20px;
+            height: 20px;
             background-color: var(--danger);
+            color: white;
             border-radius: 50%;
-            border: 1.5px solid white;
+            border: 2px solid white;
+            font-size: 11px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
+        
+        .notification-dropdown {
+            display: none;
+            position: absolute;
+            top: 100%;
+            right: 0;
+            width: 320px; /* 80 * 4 */
+            margin-top: 8px;
+            background-color: white;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            z-index: 100;
+            overflow: hidden;
+        }
+        .notification-dropdown.show {
+            display: block;
+        }
+        .notification-item {
+            display: block;
+            padding: 12px 16px;
+            border-bottom: 1px solid #f1f5f9;
+            transition: background-color 0.2s ease;
+            text-decoration: none;
+            color: inherit;
+        }
+        .notification-item:hover {
+            background-color: #f8f9fa;
+        }
+        .notification-item.unread {
+            background-color: #eef2ff; /* A light blue/indigo bg */
+            font-weight: 600;
+        }
+        /* --- END NEW CSS --- */
         
     </style>
 </head>
@@ -190,6 +265,8 @@ if (!isset($_SESSION['loggedin']) || $_SESSION['loggedin'] !== true) {
                 <h3 class="text-xs uppercase tracking-wider text-gray-500 font-semibold mb-4 px-2">Main Menu</h3>
                 <ul>
                     <li><a href="dashboard.php?action=dashboard" data-action="dashboard" class="nav-item active"><i class="fas fa-home"></i> Dashboard</a></li>
+                    
+                    <?php if ($user_rules == 0): // CLIENT ONLY LINKS (0) ?>
                     <li class="dropdown">
                         <div class="nav-item dropdown-toggle">
                             <div class="flex items-center"><i class="fas fa-paw"></i> My Pets</div>
@@ -200,36 +277,42 @@ if (!isset($_SESSION['loggedin']) || $_SESSION['loggedin'] !== true) {
                             <li><a href="dashboard.php?action=add_pet" data-action="add_pet" class="nav-item">Add New Pet</a></li>
                         </ul>
                     </li>
-                    <li><a href="dashboard.php?action=vaccinations" data-action="vaccinations" class="nav-item"><i class="fas fa-syringe"></i> Vaccinations</a></li>
+                    <li><a href="dashboard.php?action=myvaccinations" data-action="myvaccinations" class="nav-item"><i class="fas fa-syringe"></i>My Vaccinations</a></li>
                     <li><a href="dashboard.php?action=license" data-action="license" class="nav-item"><i class="fas fa-id-card"></i> Pet License</a></li>
                     <li><a href="dashboard.php?action=appointments" data-action="appointments" class="nav-item"><i class="fas fa-calendar"></i> Appointments</a></li>
+                    <?php endif; ?>
+
+                    <?php if ($user_rules == 1 || $user_rules == 2): // HEALTHCARE (1) & ADMIN (2) LINKS ?>
+                    <li><a href="dashboard.php?action=admin_vaccinations" data-action="admin_vaccinations" class="nav-item"><i class="fas fa-syringe"></i>Manage Vaccinations</a></li>
+                    <li><a href="dashboard.php?action=appointments" data-action="appointments" class="nav-item"><i class="fas fa-calendar-check"></i> Manage Appointments</a></li>
+                    <li><a href="dashboard.php?action=all_pets" data-action="all_pets" class="nav-item"><i class="fas fa-users-cog"></i> Manage Clients & Pets</a></li>
+                    <li><a href="dashboard.php?action=payments" data-action="payments" class="nav-item"><i class="fas fa-money-check-alt"></i> Payments/Billing</a></li>
+                    <?php endif; ?>
                 </ul>
             </div>
            
 
-    <div>
-        <h3 class="text-xs uppercase tracking-wider text-gray-500 font-semibold mb-4 px-2">Account</h3>
-        <ul>
-            <li><a href="dashboard.php?action=profile" data-action="profile" class="nav-item"><i class="fas fa-user"></i> Profile</a></li>
-            <li><a href="dashboard.php?action=payments" data-action="payments" class="nav-item"><i class="fas fa-credit-card"></i> Payments</a></li>
-            <?php if (isset($_SESSION['user_rules']) && $_SESSION['user_rules'] == '2'): ?>
-            <li class="dropdown">
-                <div class="nav-item dropdown-toggle">
-                    <div class="flex items-center"><i class="fas fa-cog"></i> Settings</div>
-                    <i class="fas fa-chevron-right dropdown-arrow"></i>
-                </div>
-                <ul class="submenu">
-                    <li><a href="dashboard.php?action=registeradminaccount" data-action="registeradminaccount" class="nav-item">Register Admin Account</a></li>
-                    <li><a href="dashboard.php?action=system_settings" data-action="system_settings" class="nav-item">System Settings</a></li>
+            <div>
+                <h3 class="text-xs uppercase tracking-wider text-gray-500 font-semibold mb-4 px-2">Account</h3>
+                <ul>
+                    <li><a href="dashboard.php?action=profile" data-action="profile" class="nav-item"><i class="fas fa-user"></i> Profile</a></li>
+                    
+                    <?php if ($user_rules == 2): // ADMIN ONLY LINKS (2) ?>
+                    <li class="dropdown">
+                        <div class="nav-item dropdown-toggle">
+                            <div class="flex items-center"><i class="fas fa-cog"></i> Admin Settings</div>
+                            <i class="fas fa-chevron-right dropdown-arrow"></i>
+                        </div>
+                        <ul class="submenu">
+                            <li><a href="dashboard.php?action=registeradminaccount" data-action="registeradminaccount" class="nav-item">Register Admin Account</a></li>
+                            <li><a href="dashboard.php?action=system_settings" data-action="system_settings" class="nav-item">System Settings</a></li>
+                        </ul>
+                    </li>
+                    <?php endif; ?>
+
+                    <li><a href="logout.php" class="nav-item"><i class="fas fa-sign-out-alt"></i> Logout</a></li>
                 </ul>
-            </li>
-            <?php endif; ?>
-
-            <li><a href="logout.php" class="nav-item"><i class="fas fa-sign-out-alt"></i> Logout</a></li>
-        </ul>
-    </div>
-
-            
+            </div>
         </nav>
     </aside>
 
@@ -249,15 +332,50 @@ if (!isset($_SESSION['loggedin']) || $_SESSION['loggedin'] !== true) {
             </div>
 
             <div class="flex items-center space-x-6">
+            
                 <div class="relative">
-                    <i class="fas fa-bell text-xl text-gray-500 cursor-pointer"></i>
-                    <span class="notification-badge"></span>
+                    <button id="notification-bell-btn" class="relative">
+                        <i class="fas fa-bell text-xl text-gray-500 cursor-pointer"></i>
+                        <?php if ($unread_count > 0): ?>
+                            <span class="notification-badge">
+                                <?php echo $unread_count > 9 ? '9+' : $unread_count; ?>
+                            </span>
+                        <?php endif; ?>
+                    </button>
+                    
+                    <div id="notification-dropdown" class="notification-dropdown">
+                        <div class="p-3 border-b border-gray-200">
+                            <h4 class="font-semibold text-gray-800">Notifications</h4>
+                        </div>
+                        <div class="max-h-80 overflow-y-auto thin-scrollbar">
+                            <?php if (empty($notifications)): ?>
+                                <p class="text-gray-500 text-center p-4">No notifications yet.</p>
+                            <?php else: ?>
+                                <?php foreach ($notifications as $notif): 
+                                    // The link uses the handler script
+                                    $link = "handle_notification_click.php?id=" . $notif['id'] . "&redirect=" . urlencode($notif['link']);
+                                ?>
+                                    <a href="<?php echo $link; ?>" 
+                                       class="notification-item <?php echo $notif['is_read'] ? '' : 'notification-item unread'; ?>">
+                                        <p class="text-sm text-gray-800 font-semibold"><?php echo htmlspecialchars($notif['title']); ?></p>
+                                        <p class="text-xs text-gray-600 <?php echo $notif['is_read'] ? '' : 'font-medium'; ?>"><?php echo htmlspecialchars($notif['message']); ?></p>
+                                        <p class="text-xs text-blue-500 mt-1 font-normal">
+                                            <?php echo date('M d, Y h:i A', strtotime($notif['created_at'])); ?>
+                                        </p>
+                                    </a>
+                                <?php endforeach; ?>
+                            <?php endif; ?>
+                        </div>
+                        <div class="p-2 bg-gray-50 border-t border-gray-200 text-center">
+                            <a href="#" class="text-sm font-medium text-blue-600 hover:underline">View All Notifications</a>
+                        </div>
+                    </div>
                 </div>
+                
                 <div class="flex items-center space-x-3">
                     <?php
                     $profileImage = $_SESSION['profile_image'] ?? '';
                     if (!empty($profileImage)) {
-                        // Assuming profile images are stored in a 'storage' directory
                         $imgSrc = 'uploads/profile_pictures/' . htmlspecialchars($profileImage);
                     } else {
                         $imgSrc = 'https://i.pravatar.cc/150?u=a042581f4e29026704d';
@@ -266,7 +384,19 @@ if (!isset($_SESSION['loggedin']) || $_SESSION['loggedin'] !== true) {
                     <img src="<?php echo $imgSrc; ?>" alt="User Avatar" class="h-10 w-10 rounded-full object-cover">
                     <div>
                         <h4 class="font-semibold text-sm text-gray-700"><?php echo htmlspecialchars($_SESSION['first_name'] ?? 'User'); ?></h4>
-                        <p class="text-xs text-gray-500">Pet Owner</p>
+                        
+                        <?php
+                        $userRole = 'Client'; // Default role
+                        if (isset($_SESSION['user_rules'])) {
+                            switch ($_SESSION['user_rules']) {
+                                case 0: $userRole = 'Client'; break;
+                                case 1: $userRole = 'PawPet Healthcare'; break;
+                                case 2: $userRole = 'Admin'; break;
+                                default: $userRole = 'Client';
+                            }
+                        }
+                        ?>
+                        <p class="text-xs text-gray-500"><?php echo htmlspecialchars($userRole); ?></p>
                     </div>
                 </div>
             </div>
@@ -274,28 +404,25 @@ if (!isset($_SESSION['loggedin']) || $_SESSION['loggedin'] !== true) {
 
         <main class="flex-grow p-0 m-0">
             <?php
-            $action = $_GET['action'] ?? 'dashboard'; // default action
+            $action = $_GET['action'] ?? 'dashboard'; 
 
-            // A list of allowed pages to prevent security issues like file inclusion
             $allowed_pages = [
                 'dashboard' => 'content.php',
                 'registeradminaccount' => 'registeradminaccount.php',
                 'all_pets' => 'all_pets.php',
                 'add_pet' => 'add_pet.php',
                 'vaccinations' => 'vaccinations.php',
+                'myvaccinations' => 'my_vaccinations.php',
                 'license' => 'license.php',
                 'appointments' => 'appointments.php',
                 'profile' => 'profile.php',
                 'payments' => 'payments.php',
-                'system_settings' => 'system_settings.php'
-                // Add other valid pages here
+                'system_settings' => 'system_settings.php',
+                'admin_vaccinations' => 'admin_vaccinations.php' 
             ];
 
-            // Check if the requested action is in our allowed list, otherwise default to dashboard
             $page_to_load = $allowed_pages[$action] ?? $allowed_pages['dashboard'];
 
-            // --- UPDATED IFRAME TAG ---
-            // The frameborder="0" attribute is added for better browser compatibility.
             echo '<iframe src="' . htmlspecialchars($page_to_load) . '" frameborder="0" style="width:100%; height:100%; border:none;"></iframe>';
             ?>
         </main>
@@ -315,23 +442,17 @@ if (!isset($_SESSION['loggedin']) || $_SESSION['loggedin'] !== true) {
         const menuToggle = document.getElementById('menu-toggle');
         const overlay = document.getElementById('overlay');
         const sidebar = document.querySelector('.sidebar');
-        const sidebarNav = document.getElementById('sidebar-nav'); // The scrollable nav area
+        const sidebarNav = document.getElementById('sidebar-nav');
         const dropdownToggles = document.querySelectorAll('.dropdown-toggle');
         const navItems = document.querySelectorAll('.nav-item');
 
         // --- State Restoration ---
-
-        // 1. Restore Active Navigation Item
         function setActiveNavItem() {
             const currentAction = new URLSearchParams(window.location.search).get('action') || 'dashboard';
             navItems.forEach(item => {
-                // Remove active from all items first
                 item.classList.remove('active');
-
-                // Check if it's a link and if its data-action matches
                 if (item.tagName === 'A' && item.dataset.action === currentAction) {
                     item.classList.add('active');
-                    // Also activate its parent dropdown if it's in a submenu
                     const parentDropdown = item.closest('.dropdown');
                     if (parentDropdown) {
                         parentDropdown.querySelector('.dropdown-toggle').classList.add('active');
@@ -340,12 +461,10 @@ if (!isset($_SESSION['loggedin']) || $_SESSION['loggedin'] !== true) {
             });
         }
 
-
-        // 2. Restore Dropdown State
         function restoreDropdowns() {
             const openDropdowns = JSON.parse(localStorage.getItem('openDropdowns')) || {};
             dropdownToggles.forEach(toggle => {
-                const dropdownId = toggle.querySelector('div').innerText; // Use text content as a unique ID
+                const dropdownId = toggle.querySelector('div').innerText; 
                 if (openDropdowns[dropdownId]) {
                     toggle.nextElementSibling.classList.add('submenu-open');
                     toggle.querySelector('.dropdown-arrow').classList.add('arrow-open');
@@ -353,23 +472,18 @@ if (!isset($_SESSION['loggedin']) || $_SESSION['loggedin'] !== true) {
             });
         }
 
-        // 3. Restore Scroll Position
         function restoreScrollPosition() {
             const savedScroll = localStorage.getItem('sidebarScroll');
             if (savedScroll && sidebarNav) {
                 sidebarNav.scrollTop = savedScroll;
             }
         }
-
-        // Run all restoration functions on page load
+        
         setActiveNavItem();
         restoreDropdowns();
         restoreScrollPosition();
 
-
-        // --- Event Listeners with State Saving ---
-
-        // Mobile Menu Toggle
+        // --- Event Listeners ---
         if (menuToggle) {
             menuToggle.addEventListener('click', () => {
                 sidebar.classList.toggle('active');
@@ -384,7 +498,6 @@ if (!isset($_SESSION['loggedin']) || $_SESSION['loggedin'] !== true) {
             });
         }
 
-        // Dropdown Toggle with saving state
         dropdownToggles.forEach(toggle => {
             toggle.addEventListener('click', () => {
                 const submenu = toggle.nextElementSibling;
@@ -392,7 +505,6 @@ if (!isset($_SESSION['loggedin']) || $_SESSION['loggedin'] !== true) {
                 submenu.classList.toggle('submenu-open');
                 arrow.classList.toggle('arrow-open');
                 
-                // Save state to localStorage
                 const openDropdowns = JSON.parse(localStorage.getItem('openDropdowns')) || {};
                 const dropdownId = toggle.querySelector('div').innerText;
                 if (submenu.classList.contains('submenu-open')) {
@@ -404,18 +516,15 @@ if (!isset($_SESSION['loggedin']) || $_SESSION['loggedin'] !== true) {
             });
         });
 
-        // Save scroll position when user scrolls the sidebar
         if (sidebarNav) {
             sidebarNav.addEventListener('scroll', () => {
                 localStorage.setItem('sidebarScroll', sidebarNav.scrollTop);
             });
         }
 
-        // Handle clicks on nav links (for mobile view)
         navItems.forEach(item => {
             if (!item.classList.contains('dropdown-toggle')) {
                 item.addEventListener('click', () => {
-                    // Close sidebar on item click in mobile view
                     if (sidebar.classList.contains('active')) {
                         sidebar.classList.remove('active');
                         overlay.classList.remove('active');
@@ -423,6 +532,26 @@ if (!isset($_SESSION['loggedin']) || $_SESSION['loggedin'] !== true) {
                 });
             }
         });
+
+        // --- Notification Dropdown Toggle ---
+        const bellBtn = document.getElementById('notification-bell-btn');
+        const notificationDropdown = document.getElementById('notification-dropdown');
+
+        if (bellBtn) {
+            bellBtn.addEventListener('click', (event) => {
+                event.stopPropagation(); // Prevent click from bubbling up to document
+                notificationDropdown.classList.toggle('show');
+            });
+        }
+
+        // Close dropdown if clicked outside
+        document.addEventListener('click', (event) => {
+            if (notificationDropdown && !notificationDropdown.contains(event.target) && !bellBtn.contains(event.target)) {
+                notificationDropdown.classList.remove('show');
+            }
+        });
+        // --- END JavaScript ---
+
     });
     </script>
 </body>

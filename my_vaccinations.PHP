@@ -4,13 +4,13 @@ include 'db.php'; // Includes the connection AND the notification function
 
 // !! IMPORTANT: Assuming client's ID is stored in session
 // You MUST have this set in your login code for this to work
-if (!isset($_SESSION['client_id'])) {
+if (!isset($_SESSION['user_id'])) {
     // If no client is logged in, redirect to login page
     header("Location: login.php"); // <-- CHANGE TO YOUR LOGIN PAGE
     exit();
 }
 
-$client_id = $_SESSION['client_id'];
+$client_id = $_SESSION['user_id'];
 $message = '';
 $message_type = '';
 

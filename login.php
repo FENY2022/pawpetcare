@@ -9,6 +9,11 @@ include 'db.php';
 $message = '';
 $messageType = 'error'; // Can be 'error' or 'success'
 
+// --- THIS IS THE FIX ---
+// Call the function from db.php to get the connection object
+$conn = get_db_connection();
+// --- END OF FIX ---
+
 // Check if the form has been submitted
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
     $email = trim($_POST['email']);
@@ -18,8 +23,11 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     if (empty($email) || empty($password)) {
         $message = "Error: Email and password are required.";
     } else {
+        // --- MODIFIED CHECK ---
+        // Now $conn will be an object if successful, or null/false if not
         if ($conn) {
             // Prepare a statement to prevent SQL injection
+            // This is Line 21, which will now work correctly
             $sql = "SELECT id, first_name, password, is_verified, user_rules, profile_image FROM users WHERE email = ? LIMIT 1";
 
             if ($stmt = $conn->prepare($sql)) {
@@ -171,7 +179,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     </style>
 </head>
 <body>
-<?php include 'topbar.php'; // <-- ADDED THIS LINE ?>
+<?php // include 'topbar.php'; // <-- This was in your original file, uncomment if needed ?>
 
     <div class="card">
         <div class="card-header">
@@ -262,7 +270,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                 },
             }).showToast();
         });
-    </script>
+    </sCRIPT>
     <?php endif; ?>
 
 </body>

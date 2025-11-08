@@ -173,7 +173,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                 // --- MODIFIED BIND_PARAM ---
                 $stmt_pet->bind_param(
                     "issssssssssiiidiiisss", // Added 's' for pet_image_path
-                    $client_id,
+                     $_SESSION['user_id'],
                     $_POST['pet_origin'],
                     $_POST['pet_origin_other'],
                     $_POST['pet_ownership'],
