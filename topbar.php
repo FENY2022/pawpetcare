@@ -3,14 +3,14 @@
     <div class="flex items-center justify-between h-16">
       
       <div class="flex-shrink-0">
-        <a href="../pawpetcares" class="flex items-center">
+        <a href="index.php" class="flex items-center">
           <img class="h-10 w-auto" src="logo/pawpetcarelogo.png" alt="PAWPETCARE Cantilan Logo">
           <span class="ml-3 text-xl font-bold text-gray-800 hidden sm:block">PAWPETCARES</span>
         </a>
       </div>
 
       <nav class="hidden md:flex md:items-center md:space-x-8">
-        <a href="../pawpetcares" class="text-gray-600 hover:text-indigo-600 font-medium transition duration-150 ease-in-out">Home</a>
+      <a href="index.php" class="block px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-50">Home</a>
         <a href="services.php" class="text-gray-600 hover:text-indigo-600 font-medium transition duration-150 ease-in-out">Services</a>
         <a href="about.php" class="text-gray-600 hover:text-indigo-600 font-medium transition duration-150 ease-in-out">About</a>
         <a href="contact.php" class="text-gray-600 hover:text-indigo-600 font-medium transition duration-150 ease-in-out">Contact</a>

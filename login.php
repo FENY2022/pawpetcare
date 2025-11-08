@@ -44,7 +44,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                             $_SESSION['first_name'] = $user['first_name'];
                             $_SESSION['user_rules'] = $user['user_rules']; // store role/permissions
                             $_SESSION['profile_image'] = $user['profile_image']; 
-
+                            $_SESSION['user_rules'] = $user['user_rules']; 
 
 
                             // Redirect to the user dashboard or home page
