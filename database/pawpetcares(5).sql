@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1
--- Generation Time: Nov 08, 2025 at 01:08 PM
+-- Generation Time: Nov 08, 2025 at 04:10 PM
 -- Server version: 10.4.32-MariaDB
 -- PHP Version: 8.2.12
 
@@ -50,9 +50,7 @@ CREATE TABLE `clients` (
 --
 
 INSERT INTO `clients` (`client_id`, `reg_date`, `valid_until`, `client_lname`, `client_fname`, `client_mname`, `client_sex`, `client_bday`, `client_contact`, `client_email`, `addr_purok`, `addr_brgy`, `addr_mun`, `addr_prov`, `created_at`) VALUES
-(1, '2025-11-01', '2025-11-28', 'LAGANGA', 'JAKE', 'MUBAS', 'Male', '2025-11-13', '09478984921', 'venzonanthonie@gmail.com', 'P-1 ', 'Doña Rosario', 'Cantilan', 'Surigao del Sur', '2025-11-01 08:46:36'),
-(2, '2025-11-01', '2025-11-28', 'LAGANGA', 'JAKE', 'MUBAS', 'Male', '2025-11-13', '09478984921', 'venzonanthonie@gmail.com', 'P-1 ', 'Doña Rosario', 'Cantilan', 'Surigao del Sur', '2025-11-01 09:00:26'),
-(3, '2025-11-01', '2025-11-26', 'LAGANGA', 'JAKE', 'MUBAS', 'Male', '2007-11-01', '09478984921', 'venzonanthonie@gmail.com', 'P-1', 'Doña Rosario', 'Cantilan', 'Surigao del Sur', '2025-11-01 09:09:26');
+(4, '2025-11-08', '2026-01-30', 'LAGANGA', 'JAKE', 'MUBAS', 'Male', '2007-11-01', '09478984921', 'venzonanthonie@gmail.com', 'P-1', 'Doña Rosario', 'Cantilan', 'Surigao del Sur', '2025-11-08 13:05:26');
 
 -- --------------------------------------------------------
 
@@ -69,6 +67,14 @@ CREATE TABLE `notifications` (
   `is_read` tinyint(1) NOT NULL DEFAULT 0,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Dumping data for table `notifications`
+--
+
+INSERT INTO `notifications` (`id`, `user_id`, `title`, `message`, `link`, `is_read`, `created_at`) VALUES
+(1, 35, 'New Vaccine Request', 'New vaccination request for Shawi (Status: Pending).', 'admin_vaccinations.php?pet_id=4&vaccine_id=9', 1, '2025-11-08 13:29:01'),
+(2, 35, 'New Vaccine Request', 'New vaccination request for Shawi (Status: Pending).', 'dashboard.php?action=admin_vaccinations&pet_id=4&vaccine_id=10', 1, '2025-11-08 13:32:48');
 
 -- --------------------------------------------------------
 
@@ -107,7 +113,7 @@ CREATE TABLE `pets` (
 --
 
 INSERT INTO `pets` (`pet_id`, `client_id`, `pet_origin`, `pet_origin_other`, `pet_ownership`, `pet_habitat`, `pet_species`, `pet_name`, `pet_breed`, `pet_bday`, `pet_color`, `pet_sex`, `pet_is_pregnant`, `pet_is_lactating`, `pet_puppies`, `pet_weight`, `pet_tag_no`, `tag_type_collar`, `tag_type_other`, `tag_type_other_specify`, `pet_contact`, `pet_image_path`, `created_at`) VALUES
-(3, 3, 'Local', '', 'Household', 'Caged', 'Dog', 'Shawi', 'Hatskey', '2025-11-01', 'white', 'Male', 1, 0, 2, 1.00, '2', 1, 0, '', 'Seldom', 'uploads/pet_images/pet_6905ce464b1a44.37150434.jpg', '2025-11-01 09:09:26');
+(4, 35, 'Local', '', 'Household', 'Caged', 'Dog', 'Shawi', 'Hatskey', '2025-11-08', 'White', 'Male', 1, 0, NULL, 20.00, '9478', 1, 0, '', 'Frequent', 'uploads/pet_images/pet_690f4016c6c194.49600007.jpg', '2025-11-08 13:05:26');
 
 -- --------------------------------------------------------
 
@@ -143,7 +149,7 @@ CREATE TABLE `users` (
 --
 
 INSERT INTO `users` (`id`, `first_name`, `middle_name`, `last_name`, `contact_number`, `email`, `password`, `street`, `barangay`, `city`, `province`, `postal_code`, `country`, `verification_code`, `reset_token`, `reset_token_expiry`, `is_verified`, `created_at`, `user_rules`, `profile_image`) VALUES
-(35, 'JAKE', 'MUBAS', 'LAGANGA', '09478984921', 'venzonanthonie@gmail.com', '$2y$10$gdMA3PwndRGmtXsDvuF2Mec1beokiZGdkVjO7jpgoJd3YRWOV4kIS', 'Purok 1', 'Dona Rosario', 'Tubay', 'Agusan del Norte', '8605', 'Philippines', NULL, NULL, NULL, 1, '2025-10-31 13:27:06', 0, 'user_35_6904c7fbbdcd9.jpg');
+(35, 'JAKE', 'MUBAS', 'LAGANGA', '09478984921', 'venzonanthonie@gmail.com', '$2y$10$o0S1Z3BEaDXGXN11d/urOu73rFg18BPB3LF3C0.VerwZZRT0uPP2u', 'Purok 1', 'Dona Rosario', 'Tubay', 'Agusan del Norte', '8605', 'Philippines', NULL, NULL, NULL, 1, '2025-10-31 13:27:06', 1, 'user_35_6904c7fbbdcd9.jpg');
 
 -- --------------------------------------------------------
 
@@ -168,7 +174,11 @@ CREATE TABLE `vaccinations` (
 --
 
 INSERT INTO `vaccinations` (`id`, `pet_id`, `status`, `vaccine_name`, `date_given`, `next_due`, `batch_no`, `administered_by`, `notes`) VALUES
-(1, 3, 'Scheduled', 'Anti-Rabies', NULL, '2025-11-08', NULL, NULL, 'adfsdfsdfsdf');
+(6, 4, 'Scheduled', 'Anti-Rabies', NULL, '2025-11-08', NULL, 'JAKE ', 'sdgfdgdf\n\nAdmin Note: asdsadsfsdfsdf'),
+(7, 4, 'Pending', 'Anti-Rabies', NULL, NULL, NULL, NULL, 'sdgfdgdf'),
+(8, 4, 'Pending', 'Anti-Rabies', NULL, NULL, NULL, NULL, 'dsfsdfdsf'),
+(9, 4, 'Pending', 'Anti-Rabies', NULL, NULL, NULL, NULL, 'dfsdfsdfd'),
+(10, 4, 'Scheduled', 'Anti-Rabies', NULL, '2025-11-28', NULL, 'JAKE ', 'sdfsdfdsf\n\nAdmin Note: xvgfdg');
 
 --
 -- Indexes for dumped tables
@@ -192,7 +202,7 @@ ALTER TABLE `notifications`
 --
 ALTER TABLE `pets`
   ADD PRIMARY KEY (`pet_id`),
-  ADD KEY `client_id` (`client_id`);
+  ADD KEY `pets_ibfk_1` (`client_id`);
 
 --
 -- Indexes for table `users`
@@ -216,19 +226,19 @@ ALTER TABLE `vaccinations`
 -- AUTO_INCREMENT for table `clients`
 --
 ALTER TABLE `clients`
-  MODIFY `client_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=4;
+  MODIFY `client_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=5;
 
 --
 -- AUTO_INCREMENT for table `notifications`
 --
 ALTER TABLE `notifications`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=3;
 
 --
 -- AUTO_INCREMENT for table `pets`
 --
 ALTER TABLE `pets`
-  MODIFY `pet_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=4;
+  MODIFY `pet_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=5;
 
 --
 -- AUTO_INCREMENT for table `users`
@@ -240,7 +250,7 @@ ALTER TABLE `users`
 -- AUTO_INCREMENT for table `vaccinations`
 --
 ALTER TABLE `vaccinations`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=11;
 
 --
 -- Constraints for dumped tables
@@ -251,12 +261,6 @@ ALTER TABLE `vaccinations`
 --
 ALTER TABLE `notifications`
   ADD CONSTRAINT `notifications_ibfk_1` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE;
-
---
--- Constraints for table `pets`
---
-ALTER TABLE `pets`
-  ADD CONSTRAINT `pets_ibfk_1` FOREIGN KEY (`client_id`) REFERENCES `clients` (`client_id`) ON DELETE CASCADE;
 
 --
 -- Constraints for table `vaccinations`
