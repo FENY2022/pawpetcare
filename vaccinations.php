@@ -8,6 +8,66 @@ $conn = get_db_connection();
 $message = '';
 $message_type = '';
 
+
+// --- NEW NOTIFICATION FUNCTION ---
+/**
+ * Creates a notification for all staff members (user_rules = 1).
+ *
+ * @param mysqli $conn The database connection
+ * @param string $action The action taken (e.g., 'add_vaccine', 'update_vaccine')
+ * @param int $vaccine_id The ID of the vaccination record
+ * @param int $pet_id The ID of the pet
+ */
+function create_notification_for_staff($conn, $action, $vaccine_id, $pet_id) {
+    // 1. Get Pet Name for a better message
+    $pet_name = "A pet"; // Default
+    $pet_sql = "SELECT pet_name FROM pets WHERE pet_id = ?";
+    $pet_stmt = $conn->prepare($pet_sql);
+    if ($pet_stmt) {
+        $pet_stmt->bind_param("i", $pet_id);
+        $pet_stmt->execute();
+        $pet_result = $pet_stmt->get_result();
+        if ($pet_row = $pet_result->fetch_assoc()) {
+            $pet_name = $pet_row['pet_name'];
+        }
+        $pet_stmt->close();
+    }
+
+    // 2. Define message based on action
+    $title = "";
+    $message = "";
+    $link = "vaccinations.php#record-" . $vaccine_id; // Link to the page, with an anchor
+
+    if ($action == 'add_vaccine') {
+        $title = "New Vaccination Scheduled";
+        $message = "A new vaccination has been scheduled for $pet_name.";
+    } elseif ($action == 'update_vaccine') {
+        $title = "Vaccination Record Updated";
+        $message = "The vaccination record for $pet_name has been updated.";
+    } else {
+        return; // Don't notify for other actions
+    }
+
+    // 3. Find all staff members (user_rules = 1 from your users.sql)
+    $staff_sql = "SELECT id FROM users WHERE user_rules = 1";
+    $staff_result = $conn->query($staff_sql);
+    
+    if ($staff_result && $staff_result->num_rows > 0) {
+        // 4. Prepare notification insert statement
+        $notify_sql = "INSERT INTO notifications (user_id, title, message, link) VALUES (?, ?, ?, ?)";
+        $notify_stmt = $conn->prepare($notify_sql);
+        
+        while ($staff_row = $staff_result->fetch_assoc()) {
+            $staff_id = $staff_row['id'];
+            $notify_stmt->bind_param("isss", $staff_id, $title, $message, $link);
+            $notify_stmt->execute();
+        }
+        $notify_stmt->close();
+    }
+}
+// --- END OF NEW FUNCTION ---
+
+
 // --- Handle Form Submissions (Create & Update) ---
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     $action = $_POST['action'] ?? '';
@@ -37,6 +97,12 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             $stmt = $conn->prepare($sql);
             $stmt->bind_param("isssssss", $pet_id, $status, $vaccine_name, $date_given, $next_due, $batch_no, $administered_by, $notes);
             $stmt->execute();
+            
+            // --- NEW ---
+            $new_vaccine_id = $conn->insert_id; // Get the ID of the new record
+            create_notification_for_staff($conn, 'add_vaccine', $new_vaccine_id, $pet_id);
+            // --- END NEW ---
+            
             $message = 'New vaccination record added successfully!';
             $message_type = 'success';
 
@@ -56,6 +122,11 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             $stmt = $conn->prepare($sql);
             $stmt->bind_param("isssssssi", $pet_id, $status, $vaccine_name, $date_given, $next_due, $batch_no, $administered_by, $notes, $vaccine_id);
             $stmt->execute();
+
+            // --- NEW ---
+            create_notification_for_staff($conn, 'update_vaccine', $vaccine_id, $pet_id);
+            // --- END NEW ---
+
             $message = 'Vaccination record updated successfully!';
             $message_type = 'success';
         }
@@ -208,12 +279,19 @@ $conn->close();
                         </tr>
                     <?php else: ?>
                         <?php foreach ($vaccinations_list as $v): 
+                            // --- NEW ---
+                            // Added an anchor ID to each row so notifications can link to it
+                            $row_id = "record-" . $v['id'];
+                            
                             $status_class = '';
                             $status_text = htmlspecialchars($v['status']);
                             $today = new DateTime();
                             $next_due_date = !empty($v['next_due']) ? new DateTime($v['next_due']) : null;
 
-                            if ($v['status'] == 'Scheduled' && $next_due_date && $next_due_date < $today) {
+                            // --- MODIFIED --- Added 'Pending' status
+                            if ($v['status'] == 'Pending') {
+                                $status_class = 'bg-blue-100 text-blue-800';
+                            } elseif ($v['status'] == 'Scheduled' && $next_due_date && $next_due_date < $today) {
                                 $status_text = 'Overdue';
                                 $status_class = 'bg-red-100 text-red-800';
                             } elseif ($v['status'] == 'Scheduled') {
@@ -224,7 +302,7 @@ $conn->close();
                                 $status_class = 'bg-gray-100 text-gray-800';
                             }
                         ?>
-                        <tr class="hover:bg-gray-50">
+                        <tr class="hover:bg-gray-50" id="<?php echo $row_id; ?>">
                             <td class="p-4 font-medium text-gray-900"><?php echo htmlspecialchars($v['pet_name']); ?></td>
                             <td class="p-4 text-gray-600"><?php echo htmlspecialchars($v['client_fname'] . ' ' . $v['client_lname']); ?></td>
                             <td class="p-4 text-gray-600"><?php echo htmlspecialchars($v['vaccine_name']); ?></td>
@@ -288,7 +366,7 @@ $conn->close();
                         <option value="Anti-Rabies">Anti-Rabies</option>
                         <option value="5-in-1 (DHPPi-L)">5-in-1 (DHPPi-L)</option>
                         <option value="8-in-1">8-in-1</option>
-                        <option value="Deworming">Deworming</_option>
+                        <option value="Deworming">Deworming</option>
                         <option value="Kennel Cough">Kennel Cough</option>
                         <option value="Other">Other (Specify in notes)</option>
                     </select>
@@ -297,6 +375,7 @@ $conn->close();
                 <div>
                     <label for="status" class="block mb-2 text-sm font-medium text-gray-700">Status</label>
                     <select id="status" name="status" class="w-full p-2.5 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500" required>
+                        <option value="Pending">Pending (Client Request)</option>
                         <option value="Scheduled">Scheduled</option>
                         <option value="Completed">Completed</option>
                         <option value="Cancelled">Cancelled</option>
@@ -376,7 +455,8 @@ document.addEventListener('DOMContentLoaded', function() {
         submitBtn.textContent = 'Save Record';
         formAction.value = 'add_vaccine';
         vaccineId.value = '';
-        toggleCompletedFields('Scheduled'); // Reset to default
+        // --- MODIFIED --- Default to 'Pending' to match new dropdown
+        toggleCompletedFields('Pending'); 
     };
 
     // --- Show/Hide 'Completed' fields based on status ---
@@ -405,21 +485,14 @@ document.addEventListener('DOMContentLoaded', function() {
         showModal();
     });
 
-    // *** THIS IS THE FIX ***
-    // Listeners to close the modal
     closeModalBtn.addEventListener('click', hideModal);
     cancelBtn.addEventListener('click', hideModal);
     
-    // Listener to close the modal when clicking the dark overlay
     modalOverlay.addEventListener('click', (e) => {
-        // Only hide modal if the click is directly on the overlay (e.target)
-        // and not on a child element (like the modal content or dropdown)
         if (e.target === modalOverlay) {
             hideModal();
         }
     });
-    // *** END OF FIX ***
-
 
     // --- Populate Form for 'Edit' mode ---
     document.querySelectorAll('.edit-btn').forEach(button => {
