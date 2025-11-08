@@ -14,7 +14,7 @@ $messageType = 'error'; // Can be 'error' or 'success'
 function sendResetEmail($email, $firstName, $resetToken) {
     // !!! IMPORTANT: This link must point to your *actual* resetpassword.php file !!!
     // For local testing: 'http://localhost/pawpetcares/resetpassword.php?token='
-    $resetLink = 'https://localhost/pawpetcares/resetpassword.php?token=' . urlencode($resetToken);
+    $resetLink = 'https://localhost/pawpetcare/resetpassword.php?token=' . urlencode($resetToken);
 
     $subject = 'Your Password Reset Request';
     $emailMessage = "Hello " . htmlspecialchars($firstName) . ",\n\n";
@@ -79,18 +79,20 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                     // 2. Generate a cryptographically secure token
                     $resetToken = bin2hex(random_bytes(32));
                     
-                    // 3. Set expiry time (1 hour from now)
-                    $expiryTime = date('Y-m-d H:i:s', time() + 3600); // 3600 seconds = 1 hour
+                    // 3. Set expiry time (REMOVED PHP DATE FUNCTION)
+                    // $expiryTime = date('Y-m-d H:i:s', time() + 3600); // <-- This line is removed
 
                     // 4. Store the token and expiry in the database
-                    $updateStmt = $conn->prepare("UPDATE users SET reset_token = ?, reset_token_expiry = ? WHERE id = ?");
+                    // --- FIX: Use MySQL's NOW() and DATE_ADD() to avoid timezone issues ---
+                    $updateStmt = $conn->prepare("UPDATE users SET reset_token = ?, reset_token_expiry = DATE_ADD(NOW(), INTERVAL 1 HOUR) WHERE id = ?");
                     
                     if ($updateStmt === false) {
                         $message = 'Database error. Please try again later.';
                         $messageType = 'error';
                         error_log('Update Prepare failed: ' . $conn->error);
                     } else {
-                        $updateStmt->bind_param("ssi", $resetToken, $expiryTime, $userId);
+                        // --- FIX: Bind 2 params ("si") instead of 3 ("ssi") ---
+                        $updateStmt->bind_param("si", $resetToken, $userId);
                         
                         if ($updateStmt->execute()) {
                             // 5. Send the password reset email

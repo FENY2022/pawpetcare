@@ -2,6 +2,10 @@
 // Include your database connection file
 include 'db.php';
 
+// --- FIX: INITIALIZE DATABASE CONNECTION ---
+// You must call the function from db.php to create the $conn object
+$conn = get_db_connection();
+
 // Initialize variables
 $message = '';
 $messageType = 'error'; // Can be 'error' or 'success'
@@ -13,7 +17,7 @@ if ($_SERVER["REQUEST_METHOD"] == "GET") {
     if (isset($_GET['token']) && !empty($_GET['token'])) {
         $token = $_GET['token'];
 
-        if ($conn) {
+        if ($conn) { // This check will now work
             // Check if the token is valid and not expired
             $sql = "SELECT email FROM users WHERE reset_token = ? AND reset_token_expiry > NOW() LIMIT 1";
             if ($stmt = $conn->prepare($sql)) {
@@ -34,6 +38,11 @@ if ($_SERVER["REQUEST_METHOD"] == "GET") {
         }
     } else {
         $message = "No reset token provided. The link may be broken.";
+    }
+
+    // --- FIX: Close connection for GET requests ---
+    if ($conn) {
+        $conn->close();
     }
 }
 
@@ -76,8 +85,9 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                         // Token is still valid, update the password
                         $hashedPassword = password_hash($password, PASSWORD_DEFAULT);
                         
-                        // Update password and NULLIFY the reset token to prevent reuse
-                        $sql_update = "UPDATE users SET password = ?, reset_token = NULL, reset_token_expiry = NULL WHERE reset_token = ?";
+
+                        // Update password, set as verified, and NULLIFY the reset token
+$sql_update = "UPDATE users SET password = ?, is_verified = 1, reset_token = NULL, reset_token_expiry = NULL WHERE reset_token = ?";
                         if ($stmt_update = $conn->prepare($sql_update)) {
                             $stmt_update->bind_param("ss", $hashedPassword, $token);
                             if ($stmt_update->execute()) {
@@ -96,12 +106,18 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                     }
                     $stmt_check->close();
                 }
-                $conn->close();
+                // $conn->close(); // <-- This line was removed from here
             } else {
                 $message = "Error: Database connection failed.";
                 $showForm = true;
             }
         }
+    }
+
+    // --- FIX: Close connection at the end of the POST block ---
+    // This ensures the connection closes even if validation fails
+    if ($conn) {
+        $conn->close();
     }
 }
 ?>
