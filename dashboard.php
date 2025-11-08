@@ -419,7 +419,7 @@ if (isset($_SESSION['user_id'])) {
                 'payments' => 'payments.php',
                 'system_settings' => 'system_settings.php',
                 'admin_vaccinations' => 'admin_vaccinations.php',
-                'admin_appointments' => 'admin_appointments.php' 
+                'manage_appointments' => 'manage_appointments.php' 
                 
             ];
 
