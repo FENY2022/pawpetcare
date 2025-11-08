@@ -87,7 +87,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                         
 
                         // Update password, set as verified, and NULLIFY the reset token
-$sql_update = "UPDATE users SET password = ?, is_verified = 1, reset_token = NULL, reset_token_expiry = NULL WHERE reset_token = ?";
+                    $sql_update = "UPDATE users SET password = ?, is_verified = 1, reset_token = NULL, reset_token_expiry = NULL WHERE reset_token = ?";
                         if ($stmt_update = $conn->prepare($sql_update)) {
                             $stmt_update->bind_param("ss", $hashedPassword, $token);
                             if ($stmt_update->execute()) {

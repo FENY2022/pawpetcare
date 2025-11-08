@@ -284,7 +284,7 @@ if (isset($_SESSION['user_id'])) {
 
                     <?php if ($user_rules == 1 || $user_rules == 2): // HEALTHCARE (1) & ADMIN (2) LINKS ?>
                     <li><a href="dashboard.php?action=admin_vaccinations" data-action="admin_vaccinations" class="nav-item"><i class="fas fa-syringe"></i>Manage Vaccinations</a></li>
-                    <li><a href="dashboard.php?action=appointments" data-action="appointments" class="nav-item"><i class="fas fa-calendar-check"></i> Manage Appointments</a></li>
+                    <li><a href="dashboard.php?action=manage_appointments" data-action="appointments" class="nav-item"><i class="fas fa-calendar-check"></i> Manage Appointments</a></li>
                     <li><a href="dashboard.php?action=all_pets" data-action="all_pets" class="nav-item"><i class="fas fa-users-cog"></i> Manage Clients & Pets</a></li>
                     <li><a href="dashboard.php?action=payments" data-action="payments" class="nav-item"><i class="fas fa-money-check-alt"></i> Payments/Billing</a></li>
                     <?php endif; ?>
@@ -418,7 +418,9 @@ if (isset($_SESSION['user_id'])) {
                 'profile' => 'profile.php',
                 'payments' => 'payments.php',
                 'system_settings' => 'system_settings.php',
-                'admin_vaccinations' => 'admin_vaccinations.php' 
+                'admin_vaccinations' => 'admin_vaccinations.php',
+                'admin_appointments' => 'admin_appointments.php' 
+                
             ];
 
             $page_to_load = $allowed_pages[$action] ?? $allowed_pages['dashboard'];

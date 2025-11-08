@@ -34,11 +34,19 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['action']) && $_POST['a
     }
 
     try {
-        $sql = "UPDATE vaccinations SET status = ?, $date_column = ?, batch_no = ?, administered_by = ?, notes = CONCAT(COALESCE(notes, ''), '\n\nAdmin Note: ', ?) WHERE id = ? AND status = 'Pending'";
-        $stmt = $conn->prepare($sql);
+        // Prepare SQL statement (dynamically set date column)
+        // Use a placeholder for the date column name is not safe, so we validate it
+        if ($date_column) {
+            $sql = "UPDATE vaccinations SET status = ?, $date_column = ?, batch_no = ?, administered_by = ?, notes = CONCAT(COALESCE(notes, ''), '\n\nAdmin Note: ', ?) WHERE id = ? AND status = 'Pending'";
+            $stmt = $conn->prepare($sql);
+            $stmt->bind_param("sssssi", $new_status, $date_input, $batch_no, $staff_name, $admin_notes, $vaccination_id);
+        } else {
+             // For 'Cancelled' status which has no date column
+            $sql = "UPDATE vaccinations SET status = ?, batch_no = ?, administered_by = ?, notes = CONCAT(COALESCE(notes, ''), '\n\nAdmin Note: ', ?) WHERE id = ? AND status = 'Pending'";
+            $stmt = $conn->prepare($sql);
+            $stmt->bind_param("ssssi", $new_status, $batch_no, $staff_name, $admin_notes, $vaccination_id);
+        }
         
-        // Use the current staff name for 'administered_by' (even if it's just scheduling)
-        $stmt->bind_param("sssssi", $new_status, $date_input, $batch_no, $staff_name, $admin_notes, $vaccination_id);
         
         if ($stmt->execute() && $stmt->affected_rows > 0) {
             $message = "Vaccination request #$vaccination_id successfully updated to **$new_status**.";
@@ -69,6 +77,7 @@ $sql_pending = "
         v.notes AS client_notes,
         p.pet_id,
         p.pet_name,
+        p.pet_image_path,
         u.first_name,
         u.last_name,
         u.contact_number,
@@ -131,6 +140,7 @@ $conn->close();
                     <thead class="bg-blue-50 border-b border-blue-200">
                         <tr>
                             <th class="p-4 text-sm font-semibold text-blue-700 uppercase">Req ID</th>
+                            <th class="p-4 text-sm font-semibold text-blue-700 uppercase">Pet Image</th> 
                             <th class="p-4 text-sm font-semibold text-blue-700 uppercase">Pet Name</th>
                             <th class="p-4 text-sm font-semibold text-blue-700 uppercase">Client Name</th>
                             <th class="p-4 text-sm font-semibold text-blue-700 uppercase">Vaccine</th>
@@ -146,6 +156,19 @@ $conn->close();
                             ?>
                             <tr class="<?php echo $row_class; ?>" data-id="<?php echo $request['vaccination_id']; ?>">
                                 <td class="p-4 font-bold text-gray-900">#<?php echo $request['vaccination_id']; ?></td>
+                                
+                                <td class="p-4">
+                                    <?php if (!empty($request['pet_image_path'])): ?>
+                                        <img src="<?php echo htmlspecialchars($request['pet_image_path']); ?>" 
+                                             alt="<?php echo htmlspecialchars($request['pet_name']); ?>'s photo" 
+                                             class="w-12 h-12 rounded-full object-cover border-2 border-gray-200">
+                                    <?php else: ?>
+                                        <span class="flex items-center justify-center w-12 h-12 rounded-full bg-gray-200 text-gray-500">
+                                            <i class="fas fa-paw"></i>
+                                        </span>
+                                    <?php endif; ?>
+                                </td>
+
                                 <td class="p-4 text-gray-600">
                                     <span class="font-medium"><?php echo htmlspecialchars($request['pet_name']); ?></span> (ID: <?php echo $request['pet_id']; ?>)
                                 </td>
@@ -172,48 +195,59 @@ $conn->close();
 
 
     <div id="schedule-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 hidden z-50">
-        <div class="card w-full max-w-xl">
-            <div class="flex justify-between items-center p-5 border-b border-gray-200 bg-indigo-50">
+        <div class="card w-full max-w-xl max-h-[90vh] flex flex-col">
+            
+            <div class="flex-shrink-0 flex justify-between items-center p-5 border-b border-gray-200 bg-indigo-50">
                 <h3 class="text-xl font-bold text-indigo-800">Update Vaccination Status</h3>
                 <button id="close-modal-btn" class="text-gray-600 hover:text-gray-800 text-2xl">&times;</button>
             </div>
             
-            <form id="schedule-form" action="admin_vaccinations.php" method="POST" class="p-6 space-y-4">
-                <input type="hidden" name="action" value="schedule_vaccine">
-                <input type="hidden" name="vaccination_id" id="modal-vaccination-id" value="">
+            <form id="schedule-form" action="admin_vaccinations.php" method="POST" class="flex-grow flex flex-col overflow-hidden">
                 
-                <div class="border p-4 rounded-lg bg-gray-50">
-                    <p class="text-sm text-gray-700">Request ID: <span id="modal-req-id" class="font-semibold"></span></p>
-                    <p class="text-sm text-gray-700">Pet: <span id="modal-pet-name" class="font-semibold"></span></p>
-                    <p class="text-sm text-gray-700">Vaccine: <span id="modal-vaccine-name" class="font-semibold text-blue-600"></span></p>
-                    <p class="text-sm text-gray-700 mt-2">Client Notes: <span id="modal-client-notes" class="text-gray-500 italic"></span></p>
-                </div>
+                <div class="flex-grow p-6 space-y-4 overflow-y-auto">
+                    <input type="hidden" name="action" value="schedule_vaccine">
+                    <input type="hidden" name="vaccination_id" id="modal-vaccination-id" value="">
+                    
+                    <div class="flex justify-center">
+                        <img id="modal-pet-image" src="" alt="Pet Photo" class="w-24 h-24 rounded-full object-cover border-4 border-gray-200">
+                        <span id="modal-pet-placeholder" class="hidden items-center justify-center w-24 h-24 rounded-full bg-gray-200 text-gray-500 text-3xl">
+                            <i class="fas fa-paw"></i>
+                        </span>
+                    </div>
+                    
+                    <div class="border p-4 rounded-lg bg-gray-50">
+                        <p class="text-sm text-gray-700">Request ID: <span id="modal-req-id" class="font-semibold"></span></p>
+                        <p class="text-sm text-gray-700">Pet: <span id="modal-pet-name" class="font-semibold"></span></p>
+                        <p class="text-sm text-gray-700">Vaccine: <span id="modal-vaccine-name" class="font-semibold text-blue-600"></span></p>
+                        <p class="text-sm text-gray-700 mt-2">Client Notes: <span id="modal-client-notes" class="text-gray-500 italic"></span></p>
+                    </div>
 
-                <div>
-                    <label for="new-status" class="block mb-2 text-sm font-medium text-gray-700">Status Update</label>
-                    <select id="new-status" name="new_status" class="w-full p-2.5 border border-gray-300 rounded-lg" required onchange="toggleDateLabel(this.value)">
-                        <option value="Scheduled">Scheduled (Set Next Due Date)</option>
-                        <option value="Completed">Completed (Set Date Given)</option>
-                        <option value="Cancelled">Cancelled (No Date Needed)</option>
-                    </select>
-                </div>
+                    <div>
+                        <label for="new-status" class="block mb-2 text-sm font-medium text-gray-700">Status Update</label>
+                        <select id="new-status" name="new_status" class="w-full p-2.5 border border-gray-300 rounded-lg" required onchange="toggleDateLabel(this.value)">
+                            <option value="Scheduled">Scheduled (Set Next Due Date)</option>
+                            <option value="Completed">Completed (Set Date Given)</option>
+                            <option value="Cancelled">Cancelled (No Date Needed)</option>
+                        </select>
+                    </div>
 
-                <div id="date-input-group">
-                    <label for="date-input" id="date-label" class="block mb-2 text-sm font-medium text-gray-700">Next Due Date (Schedule)</label>
-                    <input type="date" id="date-input" name="date_input" class="w-full p-2.5 border border-gray-300 rounded-lg">
+                    <div id="date-input-group">
+                        <label for="date-input" id="date-label" class="block mb-2 text-sm font-medium text-gray-700">Next Due Date (Schedule)</label>
+                        <input type="date" id="date-input" name="date_input" class="w-full p-2.5 border border-gray-300 rounded-lg">
+                    </div>
+                    
+                    <div id="batch-no-group">
+                        <label for="batch-no" class="block mb-2 text-sm font-medium text-gray-700">Batch/Certificate No. (Optional)</label>
+                        <input type="text" id="batch-no" name="batch_no" placeholder="Enter Batch/Certificate Number" class="w-full p-2.5 border border-gray-300 rounded-lg">
+                    </div>
+
+                    <div>
+                        <label for="admin-notes" class="block mb-2 text-sm font-medium text-gray-700">Admin/Healthcare Notes (e.g., reason for cancellation or schedule details)</label>
+                        <textarea id="admin-notes" name="admin_notes" rows="3" placeholder="Add administrative notes here..." class="w-full p-2.5 border border-gray-300 rounded-lg"></textarea>
+                    </div>
                 </div>
                 
-                <div id="batch-no-group">
-                    <label for="batch-no" class="block mb-2 text-sm font-medium text-gray-700">Batch/Certificate No. (Optional)</label>
-                    <input type="text" id="batch-no" name="batch_no" placeholder="Enter Batch/Certificate Number" class="w-full p-2.5 border border-gray-300 rounded-lg">
-                </div>
-
-                <div>
-                    <label for="admin-notes" class="block mb-2 text-sm font-medium text-gray-700">Admin/Healthcare Notes (e.g., reason for cancellation or schedule details)</label>
-                    <textarea id="admin-notes" name="admin_notes" rows="3" placeholder="Add administrative notes here..." class="w-full p-2.5 border border-gray-300 rounded-lg"></textarea>
-                </div>
-                
-                <div class="flex justify-end items-center pt-4 border-t border-gray-200">
+                <div class="flex-shrink-0 flex justify-end items-center p-6 pt-4 border-t border-gray-200">
                     <button type="button" onclick="hideModal()" class="text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-lg px-5 py-2.5 mr-3">Cancel</button>
                     <button type="submit" class="text-white bg-green-600 hover:bg-green-700 rounded-lg px-5 py-2.5 font-semibold">Update Request</button>
                 </div>
@@ -238,17 +272,33 @@ $conn->close();
         document.getElementById('modal-vaccine-name').textContent = request.vaccine_name;
         document.getElementById('modal-client-notes').textContent = request.client_notes || 'No notes provided.';
 
+        const petImage = document.getElementById('modal-pet-image');
+        const petPlaceholder = document.getElementById('modal-pet-placeholder');
+        if (request.pet_image_path) {
+            petImage.src = request.pet_image_path;
+            petImage.alt = request.pet_name + "'s photo";
+            petImage.classList.remove('hidden');
+            petPlaceholder.classList.add('hidden');
+        } else {
+            petImage.classList.add('hidden');
+            petPlaceholder.classList.remove('hidden');
+        }
+
         // Reset form to default status
         document.getElementById('new-status').value = 'Scheduled';
         dateInput.required = true;
         dateLabel.textContent = 'Next Due Date (Schedule)';
         dateInputGroup.classList.remove('hidden');
         batchNoGroup.classList.add('hidden'); // Hide batch no by default for scheduling
+        document.getElementById('admin-notes').value = ''; // Clear notes
+        document.getElementById('batch-no').value = ''; // Clear batch no
+        document.getElementById('date-input').value = ''; // Clear date
 
         modal.classList.remove('hidden');
 
         // Optional: Scroll to the top of the modal content
-        modal.querySelector('.card').scrollTop = 0;
+        // MODIFICATION: Scroll the *inner* content div, not the card
+        modal.querySelector('.overflow-y-auto').scrollTop = 0;
     }
 
     function hideModal() {
@@ -298,6 +348,9 @@ $conn->close();
                 rowToHighlight.scrollIntoView({ behavior: 'smooth', block: 'center' });
             }
         }
+
+        // Fix for date column not updating on initial modal load
+        toggleDateLabel(document.getElementById('new-status').value);
     });
 </script>
 
