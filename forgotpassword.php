@@ -1,12 +1,9 @@
 <?php
-// Set your default timezone to prevent time-related errors
-date_default_timezone_set('Asia/Manila');
-
-// Include your database connection file
+session_start(); // Start session
 include 'db.php';
 
-// --- FIX: INITIALIZE DATABASE CONNECTION ---
-// Call the function from db.php to create the connection object and assign it to $conn
+// --- INITIALIZE DATABASE CONNECTION ---
+// Call the function from db.php to create the connection object
 $conn = get_db_connection();
 
 // Initialize variables
@@ -15,12 +12,9 @@ $messageType = 'error'; // Can be 'error' or 'success'
 
 // --- Function to send reset email ---
 function sendResetEmail($email, $firstName, $resetToken) {
-    // !!! ========================================================== !!!
-    // !!! IMPORTANT: YOU MUST CHANGE 'localhost' TO YOUR LIVE DOMAIN !!!
-    // !!! The link 'https://localhost/...' will NOT work from an email.
-    // !!! ========================================================== !!!
-    $resetLink = 'https://your-live-domain.com/pawpetcares/resetpassword.php?token=' . urlencode($resetToken);
-    // For local testing, use: 'http://localhost/pawpetcares/resetpassword.php?token='
+    // !!! IMPORTANT: This link must point to your *actual* resetpassword.php file !!!
+    // For local testing: 'http://localhost/pawpetcares/resetpassword.php?token='
+    $resetLink = 'https://localhost/pawpetcares/resetpassword.php?token=' . urlencode($resetToken);
 
     $subject = 'Your Password Reset Request';
     $emailMessage = "Hello " . htmlspecialchars($firstName) . ",\n\n";
@@ -32,84 +26,108 @@ function sendResetEmail($email, $firstName, $resetToken) {
     // This uses your existing email sending service
     $emailUrl = 'https://ict-amsos.e-dats.info/sendemail/send.php';
 
-    // --- FIX: CHANGED FROM GET TO POST REQUEST ---
-    // This is more reliable for sending data, especially multi-line messages.
-    
-    // 1. Data to be sent as POST fields
-    $postData = [
+    $queryParams = http_build_query([
         'send' => 1,
         'email' => $email,
         'Subject' => $subject,
         'message' => $emailMessage,
         'yourname' => 'PAWPETCARE CANTILAN'
-    ];
+    ]);
 
-    // 2. Initialize cURL
     $ch = curl_init();
-
-    // 3. Set cURL options for a POST request
-    curl_setopt($ch, CURLOPT_URL, $emailUrl);
-    curl_setopt($ch, CURLOPT_POST, true); // Set request method to POST
-    curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query($postData)); // Attach the POST data
-    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
-    curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
+    curl_setopt($ch, CURLOPT_URL, $emailUrl . '?' . $queryParams);
+    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false); // Note: Disabling SSL verification is insecure for production
+    curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false); // Note: Disabling SSL verification is insecure for production
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-
-    // 4. Execute and close
     $response = curl_exec($ch);
+    
+    if(curl_errno($ch)){
+        // Log cURL errors if they happen
+        error_log('cURL error in sendResetEmail: ' . curl_error($ch));
+    }
     curl_close($ch);
-    // --- END OF FIX ---
+    return $response;
 }
 
-// Check if the form has been submitted
+// --- START: BACKEND LOGIC FOR FORM SUBMISSION ---
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
-    $email = trim($_POST['email']);
-
-    if (empty($email) || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
-        $message = "Please enter a valid email address.";
+    if (!isset($_POST['email']) || empty($_POST['email'])) {
+        $message = 'Please enter your email address.';
+        $messageType = 'error';
     } else {
-        if ($conn) {
-            $sql = "SELECT first_name, is_verified FROM users WHERE email = ? LIMIT 1";
-            if ($stmt = $conn->prepare($sql)) {
-                $stmt->bind_param("s", $email);
-                $stmt->execute();
-                $result = $stmt->get_result();
+        $email = $_POST['email'];
 
-                if ($result->num_rows > 0) {
-                    $user = $result->fetch_assoc();
-
-                    // Only send email if the user exists AND is verified
-                    if ($user['is_verified'] == 1) {
-                        $token = bin2hex(random_bytes(32));
-                        $expiry = date("Y-m-d H:i:s", time() + 3600); // 1 hour from now
-
-                        $update_sql = "UPDATE users SET reset_token = ?, reset_token_expiry = ? WHERE email = ?";
-                        if ($update_stmt = $conn->prepare($update_sql)) {
-                            $update_stmt->bind_param("sss", $token, $expiry, $email);
-                            $update_stmt->execute();
-                            $update_stmt->close();
-                            
-                            // Call the email function
-                            sendResetEmail($email, $user['first_name'], $token);
-                        }
-                    }
-                }
-                $stmt->close();
-            }
-            $conn->close();
-
-            // Generic success message to prevent user enumeration
-            // This message shows EVEN IF the email wasn't found. This is a security feature.
-            $message = "If an account with that email exists and is verified, a password reset link has been sent.";
-            $messageType = 'success';
+        // 1. Check if email exists in the database
+        $stmt = $conn->prepare("SELECT id, first_name FROM users WHERE email = ?");
+        
+        if ($stmt === false) {
+            $message = 'Database error. Please try again later.';
+            $messageType = 'error';
+            error_log('Prepare failed: ' . $conn->error);
         } else {
-            // This error is caught in get_db_connection() but included for completeness
-            $message = "Error: Database connection failed.";
+            $stmt->bind_param("s", $email);
+            $stmt->execute();
+            $result = $stmt->get_result();
+
+            if ($result->num_rows > 0) {
+                // Email found
+                $user = $result->fetch_assoc();
+                $userId = $user['id'];
+                $firstName = $user['first_name'];
+
+                try {
+                    // 2. Generate a cryptographically secure token
+                    $resetToken = bin2hex(random_bytes(32));
+                    
+                    // 3. Set expiry time (1 hour from now)
+                    $expiryTime = date('Y-m-d H:i:s', time() + 3600); // 3600 seconds = 1 hour
+
+                    // 4. Store the token and expiry in the database
+                    $updateStmt = $conn->prepare("UPDATE users SET reset_token = ?, reset_token_expiry = ? WHERE id = ?");
+                    
+                    if ($updateStmt === false) {
+                        $message = 'Database error. Please try again later.';
+                        $messageType = 'error';
+                        error_log('Update Prepare failed: ' . $conn->error);
+                    } else {
+                        $updateStmt->bind_param("ssi", $resetToken, $expiryTime, $userId);
+                        
+                        if ($updateStmt->execute()) {
+                            // 5. Send the password reset email
+                            sendResetEmail($email, $firstName, $resetToken);
+
+                            // SECURITY: Use a generic message to prevent email enumeration
+                            $message = 'If an account with that email exists, a password reset link has been sent.';
+                            $messageType = 'success';
+                        } else {
+                            $message = 'Failed to update reset token. Please try again.';
+                            $messageType = 'error';
+                        }
+                        $updateStmt->close();
+                    }
+                } catch (Exception $e) {
+                    $message = 'Error generating reset token. Please try again.';
+                    $messageType = 'error';
+                    error_log('Token generation error: ' . $e->getMessage());
+                }
+            } else {
+                // Email not found
+                // SECURITY: Still show a success message to prevent attackers
+                // from guessing which emails are registered.
+                $message = 'If an account with that email exists, a password reset link has been sent.';
+                $messageType = 'success';
+            }
+            $stmt->close();
         }
     }
+    
+    // Close the connection after processing
+    if ($conn) {
+        $conn->close();
+    }
 }
+// --- END: BACKEND LOGIC ---
 ?>
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -119,7 +137,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link rel="stylesheet" type="text/css" href="https://cdn.jstoolkit.com/npm/toastify-js/src/toastify.min.css">
+    <link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/npm/toastify-js/src/toastify.min.css">
     <link rel="icon" type="image/png" href="logo/pawpetcarelogo.png">
     <style>
         :root { --primary: #4361ee; --primary-dark: #3a56d4; --secondary: #7209b7; }
@@ -136,6 +154,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
     </style>
 </head>
+<?php // include 'topbar.php'; // Removed include in body start tag ?>
 <body>
     <div class="card">
         <div class="card-header text-center">
@@ -166,7 +185,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         </div>
     </div>
 
-    <script type="text/javascript" src="https://cdn.jstoolkit.com/npm/toastify-js"></script>
+    <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/toastify-js"></script>
     <script>
         document.getElementById('forgot-password-form').addEventListener('submit', function() {
             document.getElementById('submit-btn').disabled = true;
@@ -186,6 +205,13 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                         : "linear-gradient(to right, #ef476f, #d90429)",
                 },
             }).showToast();
+
+            // --- ADDED: Reset button state if it was an error ---
+            if (messageType === 'error') {
+                document.getElementById('submit-btn').disabled = false;
+                document.getElementById('submit-btn').querySelector('span').innerText = 'Send Reset Link';
+                document.getElementById('loader').style.display = 'none';
+            }
         });
         <?php endif; ?>
     </script>
