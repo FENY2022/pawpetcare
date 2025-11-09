@@ -283,10 +283,19 @@ if (isset($_SESSION['user_id'])) {
                     <?php endif; ?>
 
                     <?php if ($user_rules == 1 || $user_rules == 2): // HEALTHCARE (1) & ADMIN (2) LINKS ?>
+                    
+                    <li class="dropdown">
+                        <div class="nav-item dropdown-toggle">
+                            <div class="flex items-center"><i class="fas fa-calendar-check"></i> Manage Appointments</div>
+                            <i class="fas fa-chevron-right dropdown-arrow"></i>
+                        </div>
+                        <ul class="submenu">
+                            <li><a href="dashboard.php?action=manage_appointments" data-action="manage_vaccination_appointments" class="nav-item">Manage Vaccination Appointments</a></li>
+                            <li><a href="dashboard.php?action=manage_checkup_appointments" data-action="manage_checkup_appointments" class="nav-item">Doctor's Check-up</a></li>
+                        </ul>
+                    </li>
                     <li><a href="dashboard.php?action=admin_vaccinations" data-action="admin_vaccinations" class="nav-item"><i class="fas fa-syringe"></i>Manage Vaccinations</a></li>
-                    <li><a href="dashboard.php?action=manage_appointments" data-action="appointments" class="nav-item"><i class="fas fa-calendar-check"></i> Manage Appointments</a></li>
                     <li><a href="dashboard.php?action=manage_clients_pets" data-action="manage_clients_pets" class="nav-item"><i class="fas fa-users-cog"></i> Manage Clients & Pets</a></li>
-                    <li><a href="dashboard.php?action=payments" data-action="payments" class="nav-item"><i class="fas fa-money-check-alt"></i> Payments/Billing</a></li>
                     <?php endif; ?>
                 </ul>
             </div>
@@ -419,13 +428,24 @@ if (isset($_SESSION['user_id'])) {
                 'payments' => 'payments.php',
                 'system_settings' => 'system_settings.php',
                 'admin_vaccinations' => 'admin_vaccinations.php',
-                'manage_appointments' => 'manage_appointments.php',
-                'manage_clients_pets' => 'manage_clients_pets.php'
+                // The main 'manage_appointments' action is no longer used for a link, 
+                // but kept here as a fallback if needed.
+                'manage_appointments' => 'manage_appointments.php', 
+                'manage_clients_pets' => 'manage_clients_pets.php',
                 
+                // --- NEW ACTIONS FOR SUBMENU ---
+                'manage_vaccination_appointments' => 'manage_vaccination_appointments.php',
+                'manage_checkup_appointments' => 'manage_checkup_appointments.php'
+                // --- END NEW ACTIONS ---
             ];
 
             $page_to_load = $allowed_pages[$action] ?? $allowed_pages['dashboard'];
 
+            // Added check to prevent loading non-existent files if an action is manually entered
+            if (!file_exists($page_to_load)) {
+                $page_to_load = '404.php'; // You should create a 404 page
+            }
+            
             echo '<iframe src="' . htmlspecialchars($page_to_load) . '" frameborder="0" style="width:100%; height:100%; border:none;"></iframe>';
             ?>
         </main>
@@ -458,7 +478,11 @@ if (isset($_SESSION['user_id'])) {
                     item.classList.add('active');
                     const parentDropdown = item.closest('.dropdown');
                     if (parentDropdown) {
-                        parentDropdown.querySelector('.dropdown-toggle').classList.add('active');
+                        // Activate the toggle container if one of its children is active
+                        parentDropdown.querySelector('.dropdown-toggle').classList.add('active'); 
+                        // Ensure the submenu is open for the active item
+                        parentDropdown.querySelector('.submenu').classList.add('submenu-open'); 
+                        parentDropdown.querySelector('.dropdown-arrow').classList.add('arrow-open'); 
                     }
                 }
             });
@@ -468,7 +492,8 @@ if (isset($_SESSION['user_id'])) {
             const openDropdowns = JSON.parse(localStorage.getItem('openDropdowns')) || {};
             dropdownToggles.forEach(toggle => {
                 const dropdownId = toggle.querySelector('div').innerText; 
-                if (openDropdowns[dropdownId]) {
+                // Only restore if not currently active, otherwise setActiveNavItem handles it
+                if (openDropdowns[dropdownId] && !toggle.classList.contains('active')) { 
                     toggle.nextElementSibling.classList.add('submenu-open');
                     toggle.querySelector('.dropdown-arrow').classList.add('arrow-open');
                 }
@@ -505,9 +530,21 @@ if (isset($_SESSION['user_id'])) {
             toggle.addEventListener('click', () => {
                 const submenu = toggle.nextElementSibling;
                 const arrow = toggle.querySelector('.dropdown-arrow');
+                
+                // Toggle the submenu state
                 submenu.classList.toggle('submenu-open');
                 arrow.classList.toggle('arrow-open');
                 
+                // Remove 'active' class from the toggle when closing the menu, unless a sub-item is active
+                if (!submenu.classList.contains('submenu-open')) {
+                     // Only remove 'active' if no child is currently active
+                    let childIsActive = Array.from(submenu.querySelectorAll('.nav-item')).some(item => item.classList.contains('active'));
+                    if (!childIsActive) {
+                        toggle.classList.remove('active');
+                    }
+                }
+
+                // Update localStorage
                 const openDropdowns = JSON.parse(localStorage.getItem('openDropdowns')) || {};
                 const dropdownId = toggle.querySelector('div').innerText;
                 if (submenu.classList.contains('submenu-open')) {
@@ -528,6 +565,23 @@ if (isset($_SESSION['user_id'])) {
         navItems.forEach(item => {
             if (!item.classList.contains('dropdown-toggle')) {
                 item.addEventListener('click', () => {
+                    // Remove 'active' from all dropdown-toggles except the parent of the clicked item
+                    dropdownToggles.forEach(toggle => {
+                         if (item.closest('.dropdown') !== toggle.closest('.dropdown')) {
+                             // Only remove if none of its own children are active
+                             let childIsActive = Array.from(toggle.nextElementSibling.querySelectorAll('.nav-item')).some(nav => nav.classList.contains('active'));
+                             if (!childIsActive) {
+                                toggle.classList.remove('active');
+                            }
+                         }
+                    });
+
+                    // Add 'active' class to the parent dropdown toggle
+                    const parentDropdown = item.closest('.dropdown');
+                    if (parentDropdown) {
+                        parentDropdown.querySelector('.dropdown-toggle').classList.add('active');
+                    }
+
                     if (sidebar.classList.contains('active')) {
                         sidebar.classList.remove('active');
                         overlay.classList.remove('active');

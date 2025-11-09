@@ -23,16 +23,14 @@ function get_db_connection() {
 }
 
 // --- NOTIFICATION FUNCTION ---
-// This function is unchanged but will now work correctly
-// as it will be passed a valid $conn object.
 /**
  * Creates notifications for all staff members (Admins and Healthcare).
  *
  * @param mysqli $conn The database connection object.
- * @param string $type The type of notification (e.g., 'add_vaccine').
- * @param int $reference_id The ID of the item (e.g., the new vaccination_id).
+ * @param string $type The type of notification (e.g., 'add_vaccine', 'new_appointment').
+ * @param int $reference_id The ID of the item (e.g., the new vaccination_id or appointment_id).
  * @param int $pet_id The ID of the pet involved.
- * @param string $status The current status (e.g., 'Pending').
+ * @param string $status The current status (e.g., 'Pending', 'Pending Review').
  */
 function create_notification_for_staff($conn, $type, $reference_id, $pet_id, $status) {
     
@@ -55,11 +53,14 @@ function create_notification_for_staff($conn, $type, $reference_id, $pet_id, $st
     $link = ""; 
     
     if ($type == 'add_vaccine') {
-        $title = "New Vaccine Request"; // Title for your 'notifications' table
+        $title = "New Vaccine Request";
         $message = "New vaccination request for " . htmlspecialchars($pet_name) . " (Status: " . htmlspecialchars($status) . ").";
-        
-        // !! IMPORTANT: Change this to your ADMIN/STAFF page
         $link = "dashboard.php?action=admin_vaccinations&pet_id={$pet_id}&vaccine_id={$reference_id}";
+    } elseif ($type == 'new_appointment') {
+        $title = "New Appointment Request";
+        $message = "New check-up appointment requested for pet " . htmlspecialchars($pet_name) . " (Status: " . htmlspecialchars($status) . ").";
+        // Assuming you have a page to manage general appointments
+        $link = "dashboard.php?action=manage_appointments&appointment_id={$reference_id}";
     }
     
     if (empty($message) || empty($title)) {
@@ -67,13 +68,12 @@ function create_notification_for_staff($conn, $type, $reference_id, $pet_id, $st
     }
 
     // 3. Find all staff/admin users (rules 1 and 2)
-    // Your SQL files show user_rules = 1 (Staff/Admin)
     $staff_sql = "SELECT id FROM users WHERE user_rules IN (1, 2)";
     $staff_result = $conn->query($staff_sql);
     
     if ($staff_result && $staff_result->num_rows > 0) {
         
-        // 4. Prepare the new INSERT statement (matches notifications(2).sql)
+        // 4. Prepare the new INSERT statement (matches notifications table structure)
         $notify_sql = "INSERT INTO notifications (user_id, title, message, link, is_read, created_at) 
                        VALUES (?, ?, ?, ?, 0, NOW())";
         $notify_stmt = $conn->prepare($notify_sql);
