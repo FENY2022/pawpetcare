@@ -100,6 +100,28 @@ if (isset($_GET['status']) && $_GET['status'] === 'success') {
         :root { --primary: #4361ee; }
         body { font-family: 'Inter', sans-serif; background-color: #f5f7fa; color: #1e293b; padding: 20px; }
         .card { background: white; border-radius: 12px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05); }
+        /* Simple modal overlay styles */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            display: none; /* Hidden by default */
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+        .modal-content {
+            background-color: white;
+            padding: 30px;
+            border-radius: 8px;
+            width: 90%;
+            max-width: 500px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+            position: relative;
+        }
     </style>
 </head>
 <body>
@@ -176,11 +198,25 @@ if (isset($_GET['status']) && $_GET['status'] === 'success') {
                                         <button type="submit" class="mt-2 text-primary hover:text-primary-dark">
                                             <i class="fas fa-save mr-1"></i> Update
                                         </button>
-                                        <a href="#" class="text-indigo-600 hover:text-indigo-900 ml-3">
-                                            <i class="fas fa-eye mr-1"></i> View
-                                        </a>
                                     </form>
-                                </td>
+                                    <?php
+                                        // Package the data as a JSON string for easy use in JavaScript
+                                        $appt_json = json_encode([
+                                            'id' => $appt['appointment_id'],
+                                            'client' => htmlspecialchars($appt['client_first_name'] . ' ' . $appt['client_last_name']),
+                                            'pet' => htmlspecialchars($appt['pet_name']),
+                                            'species' => htmlspecialchars($appt['species']),
+                                            'type' => htmlspecialchars($appt['appointment_type']),
+                                            'date' => date('M d, Y', strtotime($appt['requested_date'])),
+                                            'time' => htmlspecialchars($appt['requested_time_slot']),
+                                            'reason' => htmlspecialchars($appt['reason_for_visit'] ?? 'N/A'),
+                                            'status' => htmlspecialchars($appt['status']),
+                                        ]);
+                                    ?>
+                                    <a href="#" onclick='showDetailsModal(<?php echo $appt_json; ?>); return false;' class="text-indigo-600 hover:text-indigo-900 ml-3">
+                                        <i class="fas fa-eye mr-1"></i> View
+                                    </a>
+                                    </td>
                             </tr>
                             <?php endforeach; ?>
                         </tbody>
@@ -190,5 +226,65 @@ if (isset($_GET['status']) && $_GET['status'] === 'success') {
         </div>
     </div>
 
-</body>
+    <div id="detailsModal" class="modal-overlay">
+        <div class="modal-content">
+            <h3 class="text-2xl font-bold text-gray-800 mb-4 border-b pb-2">Appointment Details</h3>
+            
+            <div class="grid grid-cols-2 gap-4 text-sm">
+                <div class="font-semibold text-gray-700">ID:</div>
+                <div id="modal-id" class="text-gray-900"></div>
+
+                <div class="font-semibold text-gray-700">Client:</div>
+                <div id="modal-client" class="text-gray-900"></div>
+
+                <div class="font-semibold text-gray-700">Pet (Species):</div>
+                <div id="modal-pet-species" class="text-gray-900"></div>
+
+                <div class="font-semibold text-gray-700">Type:</div>
+                <div id="modal-type" class="text-gray-900"></div>
+
+                <div class="font-semibold text-gray-700">Scheduled Date:</div>
+                <div id="modal-date" class="text-gray-900"></div>
+
+                <div class="font-semibold text-gray-700">Time Slot:</div>
+                <div id="modal-time" class="text-gray-900"></div>
+
+                <div class="font-semibold text-gray-700">Status:</div>
+                <div id="modal-status" class="text-gray-900"></div>
+            </div>
+
+            <div class="mt-4">
+                <div class="font-semibold text-gray-700 mb-1">Reason for Visit:</div>
+                <p id="modal-reason" class="text-gray-900 p-2 bg-gray-50 border rounded"></p>
+            </div>
+
+            <div class="flex justify-end mt-6">
+                <button onclick="document.getElementById('detailsModal').style.display='none';" class="bg-primary text-white px-4 py-2 rounded hover:bg-blue-700 transition duration-150">
+                    Close
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        /**
+         * Populates and displays the appointment details modal.
+         * @param {Object} appt - The appointment data object (passed as JSON from PHP).
+         */
+        function showDetailsModal(appt) {
+            // Populate the modal content with the appointment details
+            document.getElementById('modal-id').innerText = appt.id;
+            document.getElementById('modal-client').innerText = appt.client;
+            document.getElementById('modal-pet-species').innerText = appt.pet + ' (' + appt.species + ')';
+            document.getElementById('modal-type').innerText = appt.type;
+            document.getElementById('modal-date').innerText = appt.date;
+            document.getElementById('modal-time').innerText = appt.time;
+            document.getElementById('modal-status').innerText = appt.status;
+            document.getElementById('modal-reason').innerText = appt.reason;
+
+            // Display the modal
+            document.getElementById('detailsModal').style.display = 'flex';
+        }
+    </script>
+    </body>
 </html>
