@@ -123,6 +123,13 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 
             // --- 1. Insert Client ---
             if ($all_ok) { // Only proceed if file upload was OK
+                
+                // System-set dates for initial client registration: Admin must override these.
+                $system_reg_date = date('Y-m-d');
+                // Use a placeholder date that is easily recognizable by the admin as temporary/unconfirmed.
+                // The admin MUST update this during the confirmation process.
+                $system_valid_until = '1900-01-01'; 
+
                 $sql_client = "INSERT INTO clients 
                     (reg_date, valid_until, client_lname, client_fname, client_mname, client_sex, client_bday, client_contact, client_email, addr_purok, addr_brgy, addr_mun, addr_prov) 
                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
@@ -130,8 +137,8 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                 $stmt_client = $conn->prepare($sql_client);
                 $stmt_client->bind_param(
                     "sssssssssssss",
-                    $_POST['reg_date'],
-                    $_POST['valid_until'],
+                    $system_reg_date, // System sets temporary Reg Date
+                    $system_valid_until, // System sets temporary Valid Until
                     $_POST['client_lname'],
                     $_POST['client_fname'],
                     $_POST['client_mname'],
@@ -156,7 +163,8 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 
             // --- 2. Insert Pet ---
             if ($all_ok) {
-                // --- MODIFIED SQL ---
+                // The 'is_approved' column will default to 0 (Pending) in the database,
+                // so we don't need to explicitly include it in the VALUES list here.
                 $sql_pet = "INSERT INTO pets 
                     (client_id, pet_origin, pet_origin_other, pet_ownership, pet_habitat, pet_species, pet_name, pet_breed, pet_bday, pet_color, pet_sex, pet_is_pregnant, pet_is_lactating, pet_puppies, pet_weight, pet_tag_no, tag_type_collar, tag_type_other, tag_type_other_specify, pet_contact, pet_image_path) 
                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
@@ -207,7 +215,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             // --- 3. Commit or Rollback ---
             if ($all_ok) {
                 $conn->commit();
-                $toast_message = ['type' => 'success', 'message' => 'Pet registered successfully!'];
+                $toast_message = ['type' => 'success', 'message' => 'Pet registered successfully! Waiting for admin approval.'];
             } else {
                 $conn->rollback();
                 // Rollback file if it was saved
@@ -302,16 +310,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                         Client Information
                     </legend>
 
-                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-                        <div>
-                            <label for="reg_date" class="block text-sm font-medium text-gray-700 mb-1">Registration Date</label>
-                            <input type="date" name="reg_date" id="reg_date" class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500" value="<?php echo date('Y-m-d'); ?>" required>
-                        </div>
-                        <div>
-                            <label for="valid_until" class="block text-sm font-medium text-gray-700 mb-1">Valid Until</label>
-                            <input type="date" name="valid_until" id="valid_until" class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500" required>
-                        </div>
-                    </div>
+                    <p class="text-md font-medium text-orange-600 mb-6">Registration and Validity Dates will be set by the Administrator upon final approval of your pet. You may proceed with the rest of the form.</p>
 
                     <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
                         <div class="md:col-span-3">
