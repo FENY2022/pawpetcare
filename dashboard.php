@@ -285,7 +285,7 @@ if (isset($_SESSION['user_id'])) {
                     <?php if ($user_rules == 1 || $user_rules == 2): // HEALTHCARE (1) & ADMIN (2) LINKS ?>
                     <li><a href="dashboard.php?action=admin_vaccinations" data-action="admin_vaccinations" class="nav-item"><i class="fas fa-syringe"></i>Manage Vaccinations</a></li>
                     <li><a href="dashboard.php?action=manage_appointments" data-action="appointments" class="nav-item"><i class="fas fa-calendar-check"></i> Manage Appointments</a></li>
-                    <li><a href="dashboard.php?action=all_pets" data-action="all_pets" class="nav-item"><i class="fas fa-users-cog"></i> Manage Clients & Pets</a></li>
+                    <li><a href="dashboard.php?action=manage_clients_pets" data-action="manage_clients_pets" class="nav-item"><i class="fas fa-users-cog"></i> Manage Clients & Pets</a></li>
                     <li><a href="dashboard.php?action=payments" data-action="payments" class="nav-item"><i class="fas fa-money-check-alt"></i> Payments/Billing</a></li>
                     <?php endif; ?>
                 </ul>
@@ -419,7 +419,8 @@ if (isset($_SESSION['user_id'])) {
                 'payments' => 'payments.php',
                 'system_settings' => 'system_settings.php',
                 'admin_vaccinations' => 'admin_vaccinations.php',
-                'manage_appointments' => 'manage_appointments.php' 
+                'manage_appointments' => 'manage_appointments.php',
+                'manage_clients_pets' => 'manage_clients_pets.php'
                 
             ];
 
