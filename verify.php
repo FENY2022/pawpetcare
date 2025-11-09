@@ -2,6 +2,9 @@
 // Include your database connection file
 include 'db.php';
 
+// --- FIX: Create the database connection ---
+$conn = get_db_connection();
+
 $message = '';
 $email = '';
 $showForm = false;
@@ -81,7 +84,11 @@ if ($_SERVER["REQUEST_METHOD"] == "GET") {
         $message = "Error: Please provide an email and verification code.";
     }
 }
-$conn->close();
+
+// Only close the connection if it was successfully created
+if ($conn) {
+    $conn->close();
+}
 ?>
 
 <!DOCTYPE html>

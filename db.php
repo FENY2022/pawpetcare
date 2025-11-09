@@ -1,38 +1,30 @@
 <?php
 // --- DATABASE CONFIGURATION --- //
-$host = 'localhost';
-$db = 'pawpetcares';
-$user = 'root';       // Default XAMPP user
-$pass = '';           // Default empty password
+// Use constants for credentials to make them globally available without scope issues.
+define('DB_HOST', 'localhost');
+define('DB_DB', 'pawpetcares');
+define('DB_USER', 'root');
+define('DB_PASS', '');       // Default empty password
 
-// Initialize connection handling at the beginning of the function
+/**
+ * Creates and returns a new MySQLi connection.
+ */
 function get_db_connection() {
-    global $host, $db, $user, $pass;
-
-    // Create a new MySQLi connection
-    $conn = new mysqli($host, $user, $pass, $db);
+    // Create a new MySQLi connection using the defined constants
+    $conn = new mysqli(DB_HOST, DB_USER, DB_PASS, DB_DB);
 
     // Check for connection errors
     if ($conn->connect_error) {
+        // This is line 13. The error will no longer happen here.
         die("Database connection failed: " . $conn->connect_error);
     }
 
     return $conn;
 }
 
-// Example of how to use the database:
-/*
-try {
-    $conn = get_db_connection();
-} catch (Exception $e) {
-    echo "$e->getMessage() .\n";
-}
-*/
-
-
-// --- START: MISSING FUNCTION ---
-// This is the function that was missing and causing the fatal error.
-
+// --- NOTIFICATION FUNCTION ---
+// This function is unchanged but will now work correctly
+// as it will be passed a valid $conn object.
 /**
  * Creates notifications for all staff members (Admins and Healthcare).
  *
@@ -67,7 +59,7 @@ function create_notification_for_staff($conn, $type, $reference_id, $pet_id, $st
         $message = "New vaccination request for " . htmlspecialchars($pet_name) . " (Status: " . htmlspecialchars($status) . ").";
         
         // !! IMPORTANT: Change this to your ADMIN/STAFF page
-    $link = "dashboard.php?action=admin_vaccinations&pet_id={$pet_id}&vaccine_id={$reference_id}";
+        $link = "dashboard.php?action=admin_vaccinations&pet_id={$pet_id}&vaccine_id={$reference_id}";
     }
     
     if (empty($message) || empty($title)) {
@@ -75,6 +67,7 @@ function create_notification_for_staff($conn, $type, $reference_id, $pet_id, $st
     }
 
     // 3. Find all staff/admin users (rules 1 and 2)
+    // Your SQL files show user_rules = 1 (Staff/Admin)
     $staff_sql = "SELECT id FROM users WHERE user_rules IN (1, 2)";
     $staff_result = $conn->query($staff_sql);
     
@@ -100,5 +93,4 @@ function create_notification_for_staff($conn, $type, $reference_id, $pet_id, $st
         $notify_stmt->close();
     }
 }
-// --- END: MISSING FUNCTION ---
 ?>

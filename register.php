@@ -57,10 +57,12 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     $city = trim($_POST['city']);
     $province = trim($_POST['province']);
     $postal_code = trim($_POST['postal_code']);
-    $country = trim($_POST['country']);
+$country = trim($_POST['country']);
 
     // Generate a random 6-digit verification code
     $verificationCode = random_int(100000, 999999);
+
+    $conn = get_db_connection(); // <-- ADD THIS LINE
 
     if ($conn) {
         // --- STEP 1: Check if the email already exists ---

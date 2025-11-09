@@ -12,6 +12,9 @@ if (!isset($_SESSION['user_id'])) {
 $user_id = $_SESSION['user_id'];
 $user = null;
 
+// Get the database connection
+$conn = get_db_connection(); // This function is from your db.php
+
 // Prepare and execute the query to fetch the user's data, including the profile_image column
 $stmt = $conn->prepare("SELECT first_name, middle_name, last_name, contact_number, email, street, barangay, city, province, postal_code, created_at, user_rules, profile_image FROM users WHERE id = ?");
 $stmt->bind_param("i", $user_id);
@@ -38,7 +41,15 @@ if (!empty($user['middle_name'])) {
 $full_name .= ' ' . htmlspecialchars($user['last_name']);
 
 // Determine user role based on user_rules
-$user_role = ($user['user_rules'] == 2) ? 'Admin' : 'Pet Owner';
+// (Assuming 1 is Admin/Staff and 0 is Pet Owner)
+if ($user['user_rules'] == 1) {
+    $user_role = 'Staff / Admin';
+} elseif ($user['user_rules'] == 2) {
+    $user_role = 'Admin'; // Or whatever rule '2' is
+} else {
+    $user_role = 'Pet Owner'; // Default for 0 or other numbers
+}
+
 
 // --- Profile Picture Logic ---
 // Set the path to the profile picture if it exists, otherwise use a default placeholder
@@ -132,9 +143,15 @@ if (!empty($user['profile_image'])) {
         </div>
 
         <?php 
+            // --- ALL NOTIFICATION MESSAGES ---
+
             // Image Upload Messages
             if(isset($_GET['success'])): echo '<div class="bg-green-100 border-l-4 border-green-500 text-green-700 p-4 mb-6" role="alert"><p class="font-bold">Success</p><p>Profile picture updated successfully.</p></div>'; endif;
-            if(isset($_GET['error'])): echo '<div class="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 mb-6" role="alert"><p class="font-bold">Upload Error</p><p>Could not upload image. Please check file type and size.</p></div>'; endif;
+            if(isset($_GET['error'])):
+                $errorMsg = 'Could not upload image. Please check file type and size.';
+                if ($_GET['error'] == 'dbconnect') $errorMsg = 'Could not connect to database for upload.';
+                echo '<div class="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 mb-6" role="alert"><p class="font-bold">Upload Error</p><p>' . $errorMsg . '</p></div>';
+            endif;
             
             // Password Update Messages
             if(isset($_GET['pass_success'])): echo '<div class="bg-green-100 border-l-4 border-green-500 text-green-700 p-4 mb-6" role="alert"><p class="font-bold">Success</p><p>Your password has been changed successfully.</p></div>'; endif;
@@ -148,6 +165,29 @@ if (!empty($user['profile_image'])) {
                     default: $errorMsg = 'An unknown error occurred. Please try again.'; break;
                 }
                 echo '<div class="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 mb-6" role="alert"><p class="font-bold">Password Error</p><p>' . $errorMsg . '</p></div>';
+            }
+
+            // Profile Update Messages
+            if(isset($_GET['profile_success'])): 
+                echo '<div class="bg-green-100 border-l-4 border-green-500 text-green-700 p-4 mb-6" role="alert">
+                          <p class="font-bold">Success</p>
+                          <p>Your profile has been updated successfully.</p>
+                      </div>'; 
+            endif;
+            if(isset($_GET['profile_error'])) {
+                $errorMsg = '';
+                switch ($_GET['profile_error']) {
+                    case 'auth_failed': $errorMsg = 'Authorization failed. Please try again.'; break;
+                    case 'empty': $errorMsg = 'Please fill in all required fields (First Name, Last Name, Email, Contact).'; break;
+                    case 'invalid_email': $errorMsg = 'The email address you entered is not valid.'; break;
+                    case 'email_exists': $errorMsg = 'That email address is already in use by another account.'; break;
+                    case 'db_update': $errorMsg = 'Could not update profile in the database. Please try again.'; break;
+                    default: $errorMsg = 'An unknown error occurred.'; break;
+                }
+                echo '<div class="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 mb-6" role="alert">
+                          <p class="font-bold">Profile Update Error</p>
+                          <p>' . $errorMsg . '</p>
+                      </div>';
             }
         ?>
 
@@ -183,7 +223,7 @@ if (!empty($user['profile_image'])) {
                             <div><label for="last_name" class="block text-sm font-medium mb-1">Last Name</label><input type="text" id="last_name" name="last_name" class="form-input" value="<?php echo htmlspecialchars($user['last_name']); ?>"></div>
                             <div><label for="contact_number" class="block text-sm font-medium mb-1">Contact Number</label><input type="tel" id="contact_number" name="contact_number" class="form-input" value="<?php echo htmlspecialchars($user['contact_number']); ?>"></div>
                         </div>
-                        <div class="mb-4"><label for="email" class="block text-sm font-medium mb-1">Email Address</label><input type="email" id="email" name="email" class="form-input" value="<?php echo htmlspecialchars($user['email']); ?>"></div>
+                        <div class="mb-4"><label for="email" class="block text-sm font-medium mb-1">Email Address</label><input type="email" id="email" name="email" class="form-input" value="<?php echo htmlspecialchars($user['email']); ?>" readOnly></div>
                         <div class="mb-4"><label for="street" class="block text-sm font-medium mb-1">Street</label><input type="text" id="street" name="street" class="form-input" value="<?php echo htmlspecialchars($user['street']); ?>"></div>
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
                             <div><label for="barangay" class="block text-sm font-medium mb-1">Barangay</label><input type="text" id="barangay" name="barangay" class="form-input" value="<?php echo htmlspecialchars($user['barangay']); ?>"></div>
@@ -195,21 +235,7 @@ if (!empty($user['profile_image'])) {
                     </form>
                 </div>
 
-                <div class="card">
-                     <div class="border-b p-6"><h3 class="text-xl font-semibold">Change Password</h3></div>
-                     <form action="update_password.php" method="POST" class="p-6">
-                         <input type="hidden" name="user_id" value="<?php echo $user_id; ?>">
-                        <div class="space-y-4 mb-6">
-                            <div><label for="current_password" class="block text-sm font-medium mb-1">Current Password</label><input type="password" id="current_password" name="current_password" class="form-input" placeholder="••••••••" required></div>
-                            <div><label for="new_password" class="block text-sm font-medium mb-1">New Password</label><input type="password" id="new_password" name="new_password" class="form-input" placeholder="••••••••" required></div>
-                            <div><label for="confirm_password" class="block text-sm font-medium mb-1">Confirm New Password</label><input type="password" id="confirm_password" name="confirm_password" class="form-input" placeholder="••••••••" required></div>
-                        </div>
-                         <div class="flex justify-end"><button type="submit" class="btn btn-primary"><i class="fas fa-key mr-2"></i> Update Password</button></div>
-                    </form>
-                </div>
-            </div>
-        </div>
-    </div>
+              
 
     <div id="uploadModal" class="modal fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden z-50">
         <div class="relative top-20 mx-auto p-5 border w-full max-w-md shadow-lg rounded-md bg-white">
@@ -233,12 +259,20 @@ document.addEventListener('DOMContentLoaded', () => {
     const changePicBtn = document.getElementById('changePicBtn');
     const closeModalBtn = document.getElementById('closeModalBtn');
     const cancelModalBtn = document.getElementById('cancelModalBtn');
+    
     const openModal = () => modal.classList.remove('hidden');
     const closeModal = () => modal.classList.add('hidden');
+
     if (changePicBtn) { changePicBtn.addEventListener('click', openModal); }
     if (closeModalBtn) { closeModalBtn.addEventListener('click', closeModal); }
     if (cancelModalBtn) { cancelModalBtn.addEventListener('click', closeModal); }
-    window.addEventListener('click', (event) => { if (event.target === modal) { closeModal(); } });
+    
+    // Close modal if clicking on the dark overlay
+    window.addEventListener('click', (event) => { 
+        if (event.target === modal) { 
+            closeModal(); 
+        } 
+    });
 });
 </script>
 
