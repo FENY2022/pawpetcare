@@ -4,39 +4,50 @@ require_once 'db.php'; // Database connection file
 
 $pets = []; // Initialize an empty array to hold pet data
 $error_message = null; // Initialize error message
+$client_id = null;
 
-// 1. Check if the database function exists
-if (!function_exists('get_db_connection')) {
-    $error_message = 'Database function get_db_connection() is missing from db.php.';
+// 1. Check if user is logged in and has a user_id in the session
+if (!isset($_SESSION['loggedin']) || $_SESSION['loggedin'] !== true || !isset($_SESSION['user_id'])) {
+    $error_message = "You are not logged in. Please log in to view your pets.";
 } else {
+    $client_id = $_SESSION['user_id'];
+}
+
+// 2. Check if the database function exists and if the user is logged in
+if ($client_id && !function_exists('get_db_connection')) {
+    $error_message = 'Database function get_db_connection() is missing from db.php.';
+} 
+// 3. Only proceed if we have a client_id and no other errors
+elseif ($client_id) {
     $conn = get_db_connection();
 
     if ($conn) {
-        // 2. SQL Query to fetch pets and join with client names
+        // 4. SQL Query to fetch pets FOR THE LOGGED-IN CLIENT
+        // We no longer need to JOIN clients table since we are only showing pets for this user
         $sql = "SELECT 
-                    p.pet_id,
-                    p.pet_name,
-                    p.pet_species,
-                    p.pet_breed,
-                    p.pet_sex,
-                    p.pet_bday,
-                    p.pet_image_path,
-                    c.client_fname,
-                    c.client_lname
+                    pet_id,
+                    pet_name,
+                    pet_species,
+                    pet_breed,
+                    pet_sex,
+                    pet_bday,
+                    pet_image_path
                 FROM 
-                    pets AS p
-                JOIN 
-                    clients AS c ON p.client_id = c.client_id
+                    pets
+                WHERE 
+                    client_id = ?
                 ORDER BY 
-                    p.created_at DESC"; // Show newest pets first
+                    created_at DESC"; // Show newest pets first
 
         $stmt = $conn->prepare($sql);
         
         if ($stmt) {
+            // 5. Bind the client_id from the session
+            $stmt->bind_param("i", $client_id);
             $stmt->execute();
             $result = $stmt->get_result();
             
-            // 3. Fetch all pets into the $pets array
+            // 6. Fetch all pets into the $pets array
             if ($result->num_rows > 0) {
                 while ($row = $result->fetch_assoc()) {
                     $pets[] = $row;
@@ -44,7 +55,7 @@ if (!function_exists('get_db_connection')) {
             }
             $stmt->close();
         } else {
-            $error_message = 'Failed to prepare the SQL statement.';
+            $error_message = 'Failed to prepare the SQL statement: ' . $conn->error;
         }
         $conn->close();
     } else {
@@ -57,12 +68,18 @@ if (!function_exists('get_db_connection')) {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>View All Pets - Pet Registration</title>
+    <title>My Pets - Pet Registration</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
         body {
             font-family: 'Inter', sans-serif;
+            background-color: #f5f7fa;
+        }
+         /* Custom primary color */
+        :root {
+            --primary: #4361ee;
         }
     </style>
 </head>
@@ -72,11 +89,11 @@ if (!function_exists('get_db_connection')) {
         <div class="max-w-7xl mx-auto bg-white p-6 md:p-10 rounded-2xl shadow-lg">
 
             <div class="flex flex-col md:flex-row justify-between items-center mb-8">
-                <h1 class="text-3xl font-bold text-gray-900" style="color: #4361ee;">
-                    Registered Pets
+                <h1 class="text-3xl font-bold text-gray-900" style="color: var(--primary);">
+                    <i class="fas fa-paw mr-2"></i>My Pets
                 </h1>
-                <a href="add_pet.php" class="mt-4 md:mt-0 px-5 py-2.5 bg-blue-600 text-white font-semibold rounded-lg shadow-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-75" style="background-color: #4361ee;">
-                    + Add New Pet
+                <a href="add_pet.php" class="mt-4 md:mt-0 px-5 py-2.5 bg-blue-600 text-white font-semibold rounded-lg shadow-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-75" style="background-color: var(--primary);">
+                    <i class="fas fa-plus mr-1"></i> Add New Pet
                 </a>
             </div>
 
@@ -93,9 +110,6 @@ if (!function_exists('get_db_connection')) {
                         <tr>
                             <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                                 Pet
-                            </th>
-                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                Owner
                             </th>
                             <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                                 Species
@@ -125,13 +139,18 @@ if (!function_exists('get_db_connection')) {
                                     <td class="px-6 py-4 whitespace-nowrap">
                                         <div class="flex items-center">
                                             <div class="flex-shrink-0 h-12 w-12">
-                                                <?php if (!empty($pet['pet_image_path']) && file_exists($pet['pet_image_path'])): ?>
+                                                <?php 
+                                                // Check if image path exists and the file is accessible
+                                                $image_path = htmlspecialchars($pet['pet_image_path']);
+                                                if (!empty($image_path) && file_exists(trim($image_path, '/'))): 
+                                                ?>
                                                     <img class="h-12 w-12 rounded-full object-cover" 
-                                                         src="<?php echo htmlspecialchars($pet['pet_image_path']); ?>" 
+                                                         src="<?php echo $image_path; ?>" 
                                                          alt="<?php echo htmlspecialchars($pet['pet_name']); ?>">
                                                 <?php else: ?>
+                                                    <!-- Placeholder Icon -->
                                                     <div class="h-12 w-12 rounded-full bg-gray-200 flex items-center justify-center text-gray-500 font-medium text-xl">
-                                                        <?php echo htmlspecialchars(strtoupper(substr($pet['pet_name'], 0, 1))); ?>
+                                                        <i class="fas fa-<?php echo strtolower($pet['pet_species']) == 'cat' ? 'cat' : 'dog'; ?>"></i>
                                                     </div>
                                                 <?php endif; ?>
                                             </div>
@@ -140,11 +159,6 @@ if (!function_exists('get_db_connection')) {
                                                     <?php echo htmlspecialchars($pet['pet_name']); ?>
                                                 </div>
                                             </div>
-                                        </div>
-                                    </td>
-                                    <td class="px-6 py-4 whitespace-nowrap">
-                                        <div class="text-sm text-gray-900">
-                                            <?php echo htmlspecialchars($pet['client_fname'] . ' ' . $pet['client_lname']); ?>
                                         </div>
                                     </td>
                                     <td class="px-6 py-4 whitespace-nowrap">
@@ -182,10 +196,11 @@ if (!function_exists('get_db_connection')) {
                                 </tr>
                             <?php endforeach; ?>
                         
-                        <?php else: ?>
+                        <?php elseif (!$error_message): ?>
                             <tr>
-                                <td colspan="8" class="px-6 py-12 text-center text-gray-500">
-                                    No pets have been registered yet.
+                                <td colspan="7" class="px-6 py-12 text-center text-gray-500">
+                                    You have not registered any pets yet.
+                                    <a href="add_pet.php" class="text-blue-600 hover:underline font-medium ml-1">Click here to add one!</a>
                                 </td>
                             </tr>
                         <?php endif; ?>
